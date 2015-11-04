@@ -48,7 +48,6 @@ Springy goals:
 This declaration maps Product model into `products` index.  A proper doctype
 is automatically generated from specified fields and model definition.
 
-<<<<<<< Updated upstream
 ```python
 import springy
 
