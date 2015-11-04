@@ -36,7 +36,7 @@ Springy goals:
 * simple composition layer for mapping models to documents
   (`ModelIndex`)
 
-Springy is under development. Use at own risk.
+**Springy is under development. Use at own risk.**
 
 ## Example
 
@@ -46,7 +46,7 @@ Springy is under development. Use at own risk.
 This declaration maps Product model into `products` index.  A proper doctype
 is automatically generated from specified fields and model definition.
 
-```
+```python
 class ProductIndex(ModelIndex):
     class Meta:
         index = 'products'
@@ -63,7 +63,7 @@ be separated from doctype/models mappings.
 
 ### Indexing
 
-```
+```python
 products = ProductIndex()
 products.initialize()         # run only once!
 products.update_index()
@@ -71,21 +71,21 @@ products.update_index()
 
 Indexing one model instance:
 
-```
+```python
 obj = Product.objects.get(id=1)
 products.save(obj)
 ```
 
 Indexing a queryset:
 
-```
+```python
 products.save_many(Product.objects.filter(category__name='keyboards'))
 ```
 
 
 ### Querying
 
-```
+```python
 products = ProductIndex()
 result = products.query_string('mouse OR keyboard')
 ```
@@ -102,7 +102,7 @@ from `Search` (see `elasticsearch-dsl` for more information and API).
 
 ### Clearing index
 
-```
+```python
 products = ProductIndex()
 products.clear_index()
 ```
