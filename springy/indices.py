@@ -1,99 +1,58 @@
-from elasticsearch_dsl import DocType, Search
 from .connections import get_connection_for_doctype
-from django.db.models import FileField
-from .fields import doctype_field_factory
+from .fields import Field
+from .utils import model_to_dict, generate_index_name
+from .search import IterableSearch
+from .schema import model_doctype_factory, Schema
 import itertools
 import six
 
 
-def model_doctype_factory(model, index, fields=None, exclude=None):
-    class_name = '%sDocType' % model._meta.object_name
+class AlreadyRegisteredError(Exception):
+    pass
 
-    fields = fields or [field.name for field in model._meta.get_fields()]
 
-    if exclude:
-        fields = set(fields)
-        fields = list(fields.difference(fields, set(exclude)))
+class NotRegisteredError(KeyError):
+    pass
 
-    parent = (object,)
-    Meta = type(str('Meta'), parent, {
-        'index': index,
-        })
 
-    attrs = {
-            'Meta': Meta,
-            }
-    for field_name in fields:
+class IndicesRegistry(object):
+    def __init__(self):
+        self._indices = {}
+
+    def register(self, name, cls):
+        if not name:
+            raise ValueError('Index name can not be empty')
+
+        if name in self._indices:
+            raise AlreadyRegisteredError('Index `%s` is already registered' % name)
+        self._indices[name] = cls
+
+    def get(self, name):
         try:
-            attrs[field_name]=doctype_field_factory(
-                model._meta.get_field_by_name(field_name)[0])
-        except TypeError:
-            pass
-
-    return type(DocType)(class_name, (DocType,), attrs)
+            return self._indices[name]
+        except KeyError:
+            raise NotRegisteredError('Index `%s` is not registered' % name)
 
 
-def model_to_dict(obj, fields=None):
-    fields = fields or [field.name for field in obj._meta.get_fields()]
-    data = {}
-
-    for field_name in fields:
-        field = obj._meta.get_field_by_name(field_name)[0]
-        if field.is_relation:
-            if field.many_to_one or field.one_to_one:
-                value = getattr(obj, field_name+'_id')
-            else:
-                continue
-        else:
-            if isinstance(field, FileField):
-                value = getattr(obj, field_name)
-                if value is not None:
-                    value = unicode(value)
-            else:
-                value = getattr(obj, field_name)
-        if value is None:
-            continue
-        data[field_name] = value
-
-    return data
-
-
-class IterableSearch(Search):
-    """
-    This class is used to make search class iterable
-    (also fixes https://github.com/elastic/elasticsearch-dsl-py/issues/279)
-    """
-
-    def __iter__(self):
-        return iter(self.execute())
-
-    def __len__(self):
-        return self.count()
-
-    def execute(self):
-        try:
-            return self._cached_result
-        except AttributeError:
-            self._cached_result = super(IterableSearch, self).execute()
-            return self._cached_result
+registry = IndicesRegistry()
 
 
 class IndexOptions(object):
     def __init__(self, meta):
-        self.doctype = getattr(meta, 'doctype', model_doctype_factory(
+        self.document = getattr(meta, 'document', model_doctype_factory(
             meta.model, meta.index, fields=getattr(meta, 'fields', None),
             exclude=getattr(meta, 'exclude', None)))
         self.optimize_query = getattr(meta, 'optimize_query', False)
-        self.index = getattr(meta, 'index')
+        self.index = getattr(meta, 'index', None)
         self.read_consistency = getattr(meta, 'read_consistency', 'quorum')
         self.write_consistency = getattr(meta, 'write_consistency', 'quorum')
 
 
-class ModelIndexBase(type):
+class IndexBase(type):
     def __new__(cls, name, bases, attrs):
-        super_new = super(ModelIndexBase, cls).__new__
+        super_new = super(IndexBase, cls).__new__
 
-        parents = [b for b in bases if isinstance(b, ModelIndexBase)]
+        parents = [b for b in bases if isinstance(b, IndexBase)]
         if not parents:
             return super_new(cls, name, bases, attrs)
 
@@ -104,13 +63,19 @@ class ModelIndexBase(type):
         if not meta:
             meta = getattr(new_class, 'Meta', None)
 
+        fields = []
+
         setattr(new_class, '_meta', IndexOptions(meta))
-        setattr(new_class, 'model', meta.model)
+        setattr(new_class, 'model', getattr(meta, 'model', None))
+        setattr(new_class, '_schema', Schema(fields))
+
+        index_name = new_class._meta.index or generate_index_name(new_class)
+        registry.register(index_name, new_class)
 
         return new_class
 
 
-class ModelIndex(six.with_metaclass(ModelIndexBase)):
+class Index(six.with_metaclass(IndexBase)):
     def get_query_set(self):
         """
         Return queryset for indexing
@@ -121,21 +86,22 @@ class ModelIndex(six.with_metaclass(ModelIndexBase)):
         """
         Return search object instance
         """
-        return IterableSearch(index=self._meta.doctype._doc_type.index)
+        return IterableSearch(index=self._meta.document._doc_type.index)
 
     def initialize(self, using=None):
         """
         Initialize / update doctype
         """
-        self._meta.doctype.init(using=using)
+        self._meta.document.init(using=using)
 
     def create(self, datadict, meta=None):
         """
         Create document instance based on arguments
         """
         datadict['meta'] = meta or {}
-        # TODO: cleaning via DocType definition
-        return self._meta.doctype(**datadict)
+        document = self._meta.document(**datadict)
+        document.full_clean()
+        return document
 
     def query(self, *args, **kw):
         """
@@ -148,7 +114,7 @@ class ModelIndex(six.with_metaclass(ModelIndexBase)):
         Query index with `query_string` and EDisMax parser.
         This is shortcut for `.query('query_string', query='<terms>', use_dis_max=True)`
         """
-        return self.query('query_string', query=query, use_dis_max=True)
+        return self.get_search_object().parse(query)
 
     def filter(self, *args, **kw):
         """
@@ -182,10 +148,10 @@ class ModelIndex(six.with_metaclass(ModelIndexBase)):
             for item in qs:
                 yield self.to_doctype(item)
 
-        doctype_name = self._meta.doctype._doc_type.name
-        index_name = self._meta.doctype._doc_type.index
+        doctype_name = self._meta.document._doc_type.name
+        index_name = self._meta.document._doc_type.index
 
-        connection = get_connection_for_doctype(self._meta.doctype, using=using)
+        connection = get_connection_for_doctype(self._meta.document, using=using)
 
         def document_to_action(x):
             data = x.to_dict()
@@ -206,9 +172,9 @@ class ModelIndex(six.with_metaclass(ModelIndexBase)):
 
     def clear_index(self, using=None, consistency=None):
         from elasticsearch.helpers import scan, bulk
-        connection = get_connection_for_doctype(self._meta.doctype, using=using)
+        connection = get_connection_for_doctype(self._meta.document, using=using)
         objs = scan(connection, _source_include=['__non_existent_field__'])
-        index_name = self._meta.doctype._doc_type.index
+        index_name = self._meta.document._doc_type.index
 
         def document_to_action(x):
             x['_op_type'] = 'delete'
@@ -218,4 +184,9 @@ class ModelIndex(six.with_metaclass(ModelIndexBase)):
         consistency = consistency or self._meta.write_consistency
         bulk(connection, actions, index=index_name, consistency=consistency,
                 refresh=True)
+
+    def drop_index(self, using=None):
+        from elasticsearch.client.indices import IndicesClient
+        connection = get_connection_for_doctype(self._meta.document, using=using)
+        return IndicesClient(connection).delete(self._meta.index)
 

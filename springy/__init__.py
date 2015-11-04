@@ -1,4 +1,6 @@
-from elasticsearch_dsl.search import Search
-from .indices import ModelIndex, model_doctype_factory
+from .indices import Index
+from .helpers import query, parse, index
+from .utils import autodiscover
 
 default_app_config = 'springy.apps.SpringyAppConfig'
+

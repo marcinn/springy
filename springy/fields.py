@@ -1,6 +1,6 @@
 from django.db import models
 from elasticsearch_dsl import (String, Date, Integer, Boolean, Float,
-        Short, Byte, Long, Double)
+        Short, Byte, Long, Double, Field)
 
 
 MODEL_FIELDS_MAP = {
