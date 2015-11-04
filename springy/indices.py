@@ -33,6 +33,9 @@ class IndicesRegistry(object):
         except KeyError:
             raise NotRegisteredError('Index `%s` is not registered' % name)
 
+    def get_all(self):
+        return self._indices.values()
+
 
 registry = IndicesRegistry()
 
