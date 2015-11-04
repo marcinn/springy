@@ -69,6 +69,20 @@ products.initialize()         # run only once!
 products.update_index()
 ```
 
+Indexing one model instance:
+
+```
+obj = Product.objects.get(id=1)
+products.save(obj)
+```
+
+Indexing a queryset:
+
+```
+products.save_many(Product.objects.filter(category__name='keyboards'))
+```
+
+
 ### Querying
 
 ```
@@ -76,12 +90,23 @@ products = ProductIndex()
 result = products.query_string('mouse OR keyboard')
 ```
 
+Result is a `IterableSearch` instance, a "lazy" object, which inherits directly
+from `Search` (see `elasticsearch-dsl` for more information and API).
+
+`ModelIndex` provides some useful query shortcuts:
+
+* `all()` - return all documents
+* `filter()` - shortcut to `Search.filter()`
+* `query()` - shortcut to `Search.query()`
+* `query_string()` - wrapper for querying by "query string" using DisMax parser.
+
 ### Clearing index
 
 ```
 products = ProductIndex()
 products.clear_index()
 ```
+
 
 ## License
 
