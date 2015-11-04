@@ -23,6 +23,8 @@ Springy goals:
 * easy document creation and validation,
 * mapping models to documents,
 * Django management commands,
+* multiple elastic databases/connections support,
+* connections routing,
 * automated document updates on model updates.
 
 
