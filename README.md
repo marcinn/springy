@@ -10,11 +10,6 @@ It is written almost from scratch.
 
 Springy is build over `elasticsearch-dsl-py` and `elasticsearch-py`.
 
-But due to limitations and design misconceptions of `elasticsearch-dsl`,
-it will be dropped in far future. Springy will provide own schema/doctype
-definition and querying layers.
-
-
 Springy goals:
 
 * easy, queryset-like index querying
