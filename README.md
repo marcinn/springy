@@ -17,24 +17,24 @@ definition and querying layers.
 
 Springy goals:
 
-    * easy, queryset-like index querying
-    * crossindex querying,
-    * easy and fast indices managing,
-    * easy document creation and validation,
-    * mapping models to documents,
-    * Django management commands,
-    * automated document updates on model updates.
+* easy, queryset-like index querying
+* crossindex querying,
+* easy and fast indices managing,
+* easy document creation and validation,
+* mapping models to documents,
+* Django management commands,
+* automated document updates on model updates.
 
 
 ## Current status
 
-    * querying is available via extended `Search` class provided by
-      `elasticsearch-dsl`, which is wrapped in `ModelIndex` class
-    * index managing supports `initialize` and `clear` operations
-    * support for bulk create/update
-    * updating index from QuerySet or any generator/iterable
-    * simple composition layer for mapping models to documents
-      (`ModelIndex`)
+* querying is available via extended `Search` class provided by
+  `elasticsearch-dsl`, which is wrapped in `ModelIndex` class
+* index managing supports `initialize` and `clear` operations
+* support for bulk create/update
+* updating index from QuerySet or any generator/iterable
+* simple composition layer for mapping models to documents
+  (`ModelIndex`)
 
 Springy is under development. Use at own risk.
 
