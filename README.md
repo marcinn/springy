@@ -51,6 +51,17 @@ Available methods:
 * `springy.query(*indices)` - query specified indices by their names, returns `Search` lazy object
 * `springy.parse(input_query_string)` - instantiate `Search` with DisMax query parser for specified input
 
+## Autodiscover and index registration
+
+Indices are automatically registered at the import time, so they must be imported explicite via `import` command or autodiscovered by Springy.
+
+The minimal requirements for Django application are:
+  * put your app (`my_app` for example) into `INSTALLED_APPS`
+  * define indices in `my_app.search` module
+  * call `springy.autodiscover()` somewhere, for example in your project `urls` module.
+  
+*You can autodiscover any module in your apps. Just provide module name as an argument for `springy.autodiscover()`. The default is set to `search`.*
+
 ## Examples
 
 ### Defining an index
