@@ -61,9 +61,9 @@ class ProductIndex(springy.Index):
         return super(ProductIndex, self).get_query_set().filter(is_published=True)
 ```
 
-Warning! This API may be changed. ElasticSearch supports many DocTypes
+*Warning! This API may be changed. ElasticSearch supports many DocTypes
 in one index, but index structure is shared between all. Index declaration will
-be separated from doctype/models mappings.
+be separated from doctype/models mappings.*
 
 ### Index initialization
 
