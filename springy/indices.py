@@ -1,10 +1,12 @@
+from collections import defaultdict
+import itertools
+import six
+
 from .connections import get_connection_for_doctype
 from .fields import Field
 from .utils import model_to_dict, generate_index_name
 from .search import IterableSearch
 from .schema import model_doctype_factory, Schema
-import itertools
-import six
 
 
 class AlreadyRegisteredError(Exception):
@@ -18,6 +20,7 @@ class NotRegisteredError(KeyError):
 class IndicesRegistry(object):
     def __init__(self):
         self._indices = {}
+        self._model_indices = defaultdict(list)
 
     def register(self, name, cls):
         if not name:
@@ -25,7 +28,14 @@ class IndicesRegistry(object):
 
         if name in self._indices:
             raise AlreadyRegisteredError('Index `%s` is already registered' % name)
+
         self._indices[name] = cls
+
+        try:
+            self._model_indices[cls.model].append(cls)
+        except:
+            del self._indices[name]
+            raise
 
     def get(self, name):
         try:
@@ -35,6 +45,9 @@ class IndicesRegistry(object):
 
     def get_all(self):
         return self._indices.values()
+
+    def get_for_model(self, model):
+        return self._model_indices[model][:] # shallow copy
 
 
 registry = IndicesRegistry()
