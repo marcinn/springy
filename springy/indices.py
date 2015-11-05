@@ -56,9 +56,13 @@ registry = IndicesRegistry()
 
 class IndexOptions(object):
     def __init__(self, meta):
-        self.document = getattr(meta, 'document', model_doctype_factory(
-            meta.model, meta.index, fields=getattr(meta, 'fields', None),
-            exclude=getattr(meta, 'exclude', None)))
+        self.document = getattr(meta, 'document', None)
+        if not self.document:
+            self.document = model_doctype_factory(meta.model, meta.index,
+                fields=getattr(meta, 'fields', None),
+                exclude=getattr(meta, 'exclude', None)
+            )
+        self._field_names = getattr(meta, 'fields', None) or []
         self.optimize_query = getattr(meta, 'optimize_query', False)
         self.index = getattr(meta, 'index', None)
         self.read_consistency = getattr(meta, 'read_consistency', 'quorum')
@@ -154,6 +158,11 @@ class Index(six.with_metaclass(IndexBase)):
         Convert model instance to ElasticSearch document
         """
         data = model_to_dict(obj)
+        for field_name in self._meta._field_names:
+            try:
+                data[field_name] = getattr(self, 'prepare_%s' % field_name)(obj)
+            except AttributeError:
+                pass
         meta = {'id': obj.pk}
         return self.create(data, meta=meta)
 
