@@ -20,7 +20,7 @@ setup(
     description="An elasticsearch wrapper for Django",
     license="BSD",
     url="https://github.com/marcinn/springy",
-    long_description=long_description,
+    long_description='',
     version='0.1',
     author="Marcin Nowak",
     author_email="marcin.j.nowak@gmail.com",
