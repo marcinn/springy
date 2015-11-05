@@ -15,12 +15,14 @@ MODEL_FIELDS_MAP = {
     'PositiveIntegerField': Integer,
     'AutoField': Integer,
     'BigIntegerField': Long,
+    'ForeignKey': Long,
     }
 
 
 def doctype_field_factory(field, **attr):
     if field.is_relation:
-        raise TypeError('Relation fields are not supported')
+        if field.many_to_many:
+            raise TypeError('Field `%s` is m2m relation, which is not supported' % field.name)
 
     key = field.get_internal_type()
 

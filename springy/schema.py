@@ -2,6 +2,7 @@ from elasticsearch_dsl import DocType
 from elasticsearch_dsl.exceptions import ValidationException
 from django.core.exceptions import ValidationError
 from .fields import doctype_field_factory
+from .exceptions import DocumentDoesNotExist
 from collections import OrderedDict
 
 

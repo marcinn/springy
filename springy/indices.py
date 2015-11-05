@@ -7,6 +7,7 @@ from .fields import Field
 from .utils import model_to_dict, generate_index_name
 from .search import IterableSearch
 from .schema import model_doctype_factory, Schema
+from .exceptions import DocumentDoesNotExist
 
 
 class AlreadyRegisteredError(Exception):
@@ -92,6 +93,10 @@ class IndexBase(type):
 
 
 class Index(six.with_metaclass(IndexBase)):
+    @property
+    def name(self):
+        return self._meta.index
+
     def get_query_set(self):
         """
         Return queryset for indexing
@@ -152,7 +157,25 @@ class Index(six.with_metaclass(IndexBase)):
         meta = {'id': obj.pk}
         return self.create(data, meta=meta)
 
-    def save(self, obj):
+    def delete(self, obj, fail_silently=False):
+        """
+        Delete document that represents specified `obj` instance.
+
+        Raise DocumentDoesNotExist exception when document does not exist.
+        When `fail_silently` set to true, DocumentDoesNotExist will be silenced.
+        """
+
+        from elasticsearch.exceptions import NotFoundError
+        doc = self.to_doctype(obj)
+
+        try:
+            doc.delete()
+        except NotFoundError:
+            if not fail_silently:
+                raise DocumentDoesNotExist('Document `%s` (id=%s) does not exists in index `%s`' % (
+                    doc._doc_type.name, doc.meta.id, self.name))
+
+    def save(self, obj, force=False):
         doc = self.to_doctype(obj)
         doc.save()
 
@@ -181,6 +204,26 @@ class Index(six.with_metaclass(IndexBase)):
 
         return bulk(connection, actions, index=index_name, doc_type=doctype_name,
                 consistency=consistency, refresh=True)[0]
+
+    def update(self, obj):
+        """
+        Perform create/update document only if matching indexing queryset
+        """
+
+        try:
+            obj = self.get_query_set().filter(pk=obj.pk)[0]
+        except IndexError:
+            pass
+        else:
+            self.save(obj)
+
+    def update_queryset(self, queryset):
+        """
+        Perform create/update of queryset but narrowed with indexing queryset
+        """
+        qs = self.get_query_set()
+        qs.query.combine(queryset.query, 'and')
+        return self.save_many(qs)
 
     def update_index(self, using=None, consistency=None):
         self.save_many(self.get_query_set(), using=using,

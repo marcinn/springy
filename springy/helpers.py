@@ -26,4 +26,10 @@ def index(name):
     return registry.get(name)()
 
 
+def model_indices(model_class):
+    """
+    Shortcut to getting registered index instances for specified model
+    """
+
+    return map(lambda x: x(), registry.get_for_model(model_class))
 
