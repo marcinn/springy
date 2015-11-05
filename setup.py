@@ -7,7 +7,6 @@ from setuptools import setup, find_packages
 install_requires = [
     'django>=1.7',
     'elasticsearch-dsl>=0.0.9',
-    'python-dateutil',
 ]
 
 tests_require = []
