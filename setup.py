@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 
 install_requires = [
-    'django>=1.7',
+    'django>=1.7,<1.10',
     'elasticsearch-dsl>=0.0.9',
 ]
 
@@ -21,7 +21,7 @@ setup(
     license="BSD",
     url="https://github.com/marcinn/springy",
     long_description='',
-    version='0.2',
+    version='0.3',
     author="Marcin Nowak",
     author_email="marcin.j.nowak@gmail.com",
     packages=find_packages(
