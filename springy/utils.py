@@ -1,14 +1,23 @@
 from django.db.models import FileField
+from django.db.models.options import Options
 from django.utils import module_loading
 
 
+if hasattr(Options, 'get_fields'):
+    def get_model_fields(obj):
+        return obj._meta.get_fields()
+else:
+    def get_model_fields(obj):
+        return obj._meta.fields
+
+
 def model_to_dict(obj, fields=None):
-    fields = fields or [field.name for field in obj._meta.get_fields()]
+    fields = fields or [field.name for field in get_model_fields(obj)]
     data = {}
 
     for field_name in fields:
         field = obj._meta.get_field_by_name(field_name)[0]
-        if field.is_relation:
+        if getattr(field, 'is_relation', None) or getattr(field, 'related', None):
             if field.many_to_one or field.one_to_one:
                 value = getattr(obj, field_name+'_id')
             else:

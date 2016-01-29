@@ -5,3 +5,7 @@ class DocumentDoesNotExist(Exception):
 
 class IndexDoesNotExist(Exception):
     pass
+
+
+class FieldDoesNotExist(Exception):
+    pass

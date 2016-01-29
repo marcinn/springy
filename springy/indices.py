@@ -7,7 +7,7 @@ from .fields import Field
 from .utils import model_to_dict, generate_index_name
 from .search import IterableSearch
 from .schema import model_doctype_factory, Schema
-from .exceptions import DocumentDoesNotExist
+from .exceptions import DocumentDoesNotExist, FieldDoesNotExist
 
 
 class AlreadyRegisteredError(Exception):
@@ -50,23 +50,42 @@ class IndicesRegistry(object):
     def get_for_model(self, model):
         return self._model_indices[model][:] # shallow copy
 
+    def unregister(self, cls):
+        to_unregister = []
+        for name, idx in self._indices.items():
+            if idx == cls:
+                to_unregister.append(name)
+        if not to_unregister:
+            raise NotRegisteredError('Index class `%s` is not registered')
+
+        self._model_indices[cls.model].remove(cls)
+
+        for name in to_unregister:
+            del self._indices[name]
+
+    def unregister_all(self):
+        self._indices={}
+        self._model_indices = defaultdict(list)
+
 
 registry = IndicesRegistry()
 
 
 class IndexOptions(object):
-    def __init__(self, meta):
+    def __init__(self, meta, declared_fields):
         self.document = getattr(meta, 'document', None)
-        if not self.document:
-            self.document = model_doctype_factory(meta.model, meta.index,
-                fields=getattr(meta, 'fields', None),
-                exclude=getattr(meta, 'exclude', None)
-            )
-        self._field_names = getattr(meta, 'fields', None) or []
         self.optimize_query = getattr(meta, 'optimize_query', False)
         self.index = getattr(meta, 'index', None)
         self.read_consistency = getattr(meta, 'read_consistency', 'quorum')
         self.write_consistency = getattr(meta, 'write_consistency', 'quorum')
+        self._field_names = getattr(meta, 'fields', None) or []
+        self._declared_fields = declared_fields
+
+    def setup_doctype(self, meta, index):
+        self.document = model_doctype_factory(meta.model, index,
+            fields=getattr(meta, 'fields', None),
+            exclude=getattr(meta, 'exclude', None)
+        )
 
 
 class IndexBase(type):
@@ -77,18 +96,29 @@ class IndexBase(type):
         if not parents:
             return super_new(cls, name, bases, attrs)
 
-        module = attrs.pop('__module__')
         new_class = super_new(cls, name, bases, attrs)
 
         meta = attrs.pop('Meta', None)
         if not meta:
             meta = getattr(new_class, 'Meta', None)
 
-        fields = []
+        declared_fields = {}
+        for _attrname, _attr in new_class.__dict__.items():
+            if isinstance(_attr, Field):
+                declared_fields[_attrname]=_attr
 
-        setattr(new_class, '_meta', IndexOptions(meta))
+        setattr(new_class, '_meta', IndexOptions(meta, declared_fields))
         setattr(new_class, 'model', getattr(meta, 'model', None))
-        setattr(new_class, '_schema', Schema(fields))
+
+        if not new_class._meta.document:
+            new_class._meta.setup_doctype(meta, new_class)
+
+        setattr(new_class, '_schema', Schema(new_class._meta.document.get_all_fields()))
+
+        schema_fields = new_class._schema.get_field_names()
+        for fieldname in new_class._meta._field_names:
+            if not fieldname in schema_fields:
+                raise FieldDoesNotExist('Field `%s` is not defined')
 
         index_name = new_class._meta.index or generate_index_name(new_class)
         registry.register(index_name, new_class)
@@ -159,10 +189,9 @@ class Index(six.with_metaclass(IndexBase)):
         """
         data = model_to_dict(obj)
         for field_name in self._meta._field_names:
-            try:
-                data[field_name] = getattr(self, 'prepare_%s' % field_name)(obj)
-            except AttributeError:
-                pass
+            prepared_field_name = 'prepare_%s' % field_name
+            if hasattr(self, prepared_field_name):
+                data[field_name] = getattr(self, prepared_field_name)(obj)
         meta = {'id': obj.pk}
         return self.create(data, meta=meta)
 

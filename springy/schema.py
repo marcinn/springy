@@ -5,6 +5,11 @@ from .fields import doctype_field_factory
 from .exceptions import DocumentDoesNotExist
 from collections import OrderedDict
 
+try:
+    from django.db.models import FieldDoesNotExist
+except ImportError:
+    FieldDoesNotExist = TypeError
+
 
 class Document(DocType):
     """
@@ -61,6 +66,10 @@ class Document(DocType):
     def as_dict(self):
         return dict(self._d_)
 
+    @classmethod
+    def get_all_fields(cls):
+        return cls._doc_type.mapping.properties._params['properties']
+
 
 def model_doctype_factory(model, index, fields=None, exclude=None):
     class_name = '%sDocument' % model._meta.object_name
@@ -73,7 +82,7 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
 
     parent = (object,)
     Meta = type(str('Meta'), parent, {
-        'index': index,
+        'index': index._meta.index,
         })
 
     attrs = {
@@ -83,8 +92,12 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
         try:
             attrs[field_name]=doctype_field_factory(
                 model._meta.get_field_by_name(field_name)[0])
-        except TypeError:
-            pass
+        except FieldDoesNotExist:
+            try:
+                attrs[field_name] = index._meta._declared_fields[field_name]
+            except KeyError:
+                pass
+
 
     return type(Document)(class_name, (Document,), attrs)
 
@@ -149,7 +162,5 @@ class DocumentForm(object):
         except ValidationError:
             pass
         return self._is_valid
-
-
 
 

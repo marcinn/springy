@@ -20,7 +20,7 @@ MODEL_FIELDS_MAP = {
 
 
 def doctype_field_factory(field, **attr):
-    if field.is_relation:
+    if getattr(field, 'is_relation', None) or getattr(field, 'related', None):
         if field.many_to_many:
             raise TypeError('Field `%s` is m2m relation, which is not supported' % field.name)
 
