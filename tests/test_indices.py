@@ -102,7 +102,7 @@ class IndexRegistryTestCase(unittest.TestCase):
                 index = 'index'
 
         self.assertEqual(len(springy.registry.get_all()), 1)
-        self.assertEqual(springy.registry.get_all()[0], MyTestIndex)
+        self.assertEqual(list(springy.registry.get_all())[0], MyTestIndex)
 
     def test_successful_registering_index_at_given_name(self):
         class MyTestIndex(springy.Index):

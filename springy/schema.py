@@ -4,6 +4,8 @@ from django.core.exceptions import ValidationError
 from .fields import doctype_field_factory
 from .exceptions import DocumentDoesNotExist
 from collections import OrderedDict
+import sys
+
 
 try:
     from django.db.models import FieldDoesNotExist
@@ -49,7 +51,8 @@ class Document(DocType):
     def full_clean(self):
         try:
             super(Document, self).full_clean()
-        except ValidationException, ex:
+        except (ValidationException):
+            ex = sys.exc_info()[1]
             raise ValidationError(ex)
         else:
             self.clean_invalid_keys()
@@ -136,7 +139,8 @@ class DocumentForm(object):
         for name, field in self.fields.items():
             try:
                 cleaned_data[name] = field.clean(cleaned_data.get(name))
-            except ValidationError, ex:
+            except (ValidationError):
+                ex = sys.exc_info()[1]
                 exceptions.append(ex)
                 errors[name]=unicode(ex)
 

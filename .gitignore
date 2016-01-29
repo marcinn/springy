@@ -1,4 +1,7 @@
 /.env
+/.env27
+/.env26
+/.env3
 *.pyc
 
 /build/
