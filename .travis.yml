@@ -13,4 +13,3 @@ script:
   - nosetests --with-coverage --cover-erase --cover-package=springy
 after_success:
   - coveralls
-
