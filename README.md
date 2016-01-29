@@ -1,5 +1,8 @@
 # Springy
 
+![TravisBadge](https://travis-ci.org/marcinn/springy.svg?branch=master)
+
+
 Springy is a Django wrapper for elasticsearch.
 
 Originally based on BungieSearch, but with many conceptual changes.
