@@ -7,7 +7,7 @@ from .fields import Field
 from .utils import model_to_dict, generate_index_name
 from .search import IterableSearch
 from .schema import model_doctype_factory, Schema
-from .exceptions import DocumentDoesNotExist
+from .exceptions import DocumentDoesNotExist, FieldDoesNotExist
 
 
 class AlreadyRegisteredError(Exception):
@@ -50,6 +50,23 @@ class IndicesRegistry(object):
     def get_for_model(self, model):
         return self._model_indices[model][:] # shallow copy
 
+    def unregister(self, cls):
+        to_unregister = []
+        for name, idx in self._indices.items():
+            if idx == cls:
+                to_unregister.append(name)
+        if not to_unregister:
+            raise NotRegisteredError('Index class `%s` is not registered')
+
+        self._model_indices[cls.model].remove(cls)
+
+        for name in to_unregister:
+            del self._indices[name]
+
+    def unregister_all(self):
+        self._indices={}
+        self._model_indices = defaultdict(list)
+
 
 registry = IndicesRegistry()
 
@@ -79,7 +96,6 @@ class IndexBase(type):
         if not parents:
             return super_new(cls, name, bases, attrs)
 
-        module = attrs.pop('__module__')
         new_class = super_new(cls, name, bases, attrs)
 
         meta = attrs.pop('Meta', None)
@@ -98,6 +114,11 @@ class IndexBase(type):
             new_class._meta.setup_doctype(meta, new_class)
 
         setattr(new_class, '_schema', Schema(new_class._meta.document.get_all_fields()))
+
+        schema_fields = new_class._schema.get_field_names()
+        for fieldname in new_class._meta._field_names:
+            if not fieldname in schema_fields:
+                raise FieldDoesNotExist('Field `%s` is not defined')
 
         index_name = new_class._meta.index or generate_index_name(new_class)
         registry.register(index_name, new_class)
