@@ -2,7 +2,7 @@ from elasticsearch_dsl import DocType
 from elasticsearch_dsl.exceptions import ValidationException
 from django.core.exceptions import ValidationError
 from .fields import doctype_field_factory
-from .exceptions import DocumentDoesNotExist
+from .exceptions import DocumentDoesNotExist  # NOQA
 from collections import OrderedDict
 
 try:
@@ -43,13 +43,13 @@ class Document(DocType):
         keys = self._doc_type.mapping.properties.properties._d_.keys()
 
         for key in self._d_.keys():
-            if not key in keys:
+            if key not in keys:
                 del self._d_[key]
 
     def full_clean(self):
         try:
             super(Document, self).full_clean()
-        except ValidationException, ex:
+        except ValidationException as ex:
             raise ValidationError(ex)
         else:
             self.clean_invalid_keys()
@@ -88,16 +88,16 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
     attrs = {
             'Meta': Meta,
             }
+
     for field_name in fields:
         try:
-            attrs[field_name]=doctype_field_factory(
+            attrs[field_name] = doctype_field_factory(
                 model._meta.get_field_by_name(field_name)[0])
         except FieldDoesNotExist:
             try:
                 attrs[field_name] = index._meta._declared_fields[field_name]
             except KeyError:
                 pass
-
 
     return type(Document)(class_name, (Document,), attrs)
 
@@ -136,9 +136,9 @@ class DocumentForm(object):
         for name, field in self.fields.items():
             try:
                 cleaned_data[name] = field.clean(cleaned_data.get(name))
-            except ValidationError, ex:
+            except ValidationError as ex:
                 exceptions.append(ex)
-                errors[name]=unicode(ex)
+                errors[name] = unicode(ex)  # NOQA
 
         self.cleaned_data = cleaned_data
         self._errors = errors
@@ -162,5 +162,3 @@ class DocumentForm(object):
         except ValidationError:
             pass
         return self._is_valid
-
-

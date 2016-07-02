@@ -32,4 +32,3 @@ def model_indices(model_class):
     """
 
     return map(lambda x: x(), registry.get_for_model(model_class))
-

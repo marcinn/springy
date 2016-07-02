@@ -26,4 +26,3 @@ class IterableSearch(BaseSearch):
 
 class Search(IterableSearch):
     pass
-

@@ -17,7 +17,8 @@ def model_to_dict(obj, fields=None):
 
     for field_name in fields:
         field = obj._meta.get_field_by_name(field_name)[0]
-        if getattr(field, 'is_relation', None) or getattr(field, 'related', None):
+        if getattr(field, 'is_relation', None) or getattr(
+                field, 'related', None):
             if field.many_to_one or field.one_to_one:
                 value = getattr(obj, field_name+'_id')
             else:
@@ -26,7 +27,7 @@ def model_to_dict(obj, fields=None):
             if isinstance(field, FileField):
                 value = getattr(obj, field_name)
                 if value is not None:
-                    value = unicode(value)
+                    value = unicode(value)  # NOQA
             else:
                 value = getattr(obj, field_name)
         if value is None:
@@ -41,7 +42,7 @@ def index_to_string(x):
         return x._meta.index
     except AttributeError:
         pass
-    return unicode(x)
+    return unicode(x)  # NOQA
 
 
 def generate_index_name(cls):
@@ -50,4 +51,3 @@ def generate_index_name(cls):
 
 def autodiscover(module_name='search'):
     module_loading.autodiscover_modules(module_name)
-
