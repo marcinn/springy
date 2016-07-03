@@ -110,6 +110,9 @@ class IndexBase(type):
         setattr(new_class, '_meta', IndexOptions(meta, declared_fields))
         setattr(new_class, 'model', getattr(meta, 'model', None))
 
+        index_name = new_class._meta.index or generate_index_name(new_class)
+        new_class._meta.index = index_name
+
         if not new_class._meta.document:
             new_class._meta.setup_doctype(meta, new_class)
 
@@ -122,7 +125,6 @@ class IndexBase(type):
                 raise FieldDoesNotExist(
                         'Field `%s` is not defined' % fieldname)
 
-        index_name = new_class._meta.index or generate_index_name(new_class)
         registry.register(index_name, new_class)
 
         return new_class

@@ -12,14 +12,26 @@ class Command(BaseCommand):
     can_import_settings = True
 
     def add_arguments(self, parser):
-        parser.add_argument('command', nargs=1, type=str)
-        parser.add_argument('index', nargs='*', type=str)
         parser.add_argument(
-                '--noconfirm', default=False, action='store_true')
+                'command', type=str, choices=self._available_commands(),
+                action='store')
+        parser.add_argument(
+                'index', nargs='*', type=str, metavar='INDEX',
+                help='Optional index names (default: all registered)')
+        parser.add_argument('--noconfirm', default=False, action='store_true')
+
+    def _available_commands(self):
+        commands = []
+
+        for method in dir(self):
+            if method.startswith('do_'):
+                commands.append(method[3:])
+
+        return commands
 
     def handle(self, **kw):
 
-        command = kw['command'].pop()
+        command = kw.pop('command')
         indices = kw['index']
         no_confirm = kw['noconfirm']
 
@@ -44,6 +56,15 @@ class Command(BaseCommand):
         for index_cls in indices:
             index = index_cls()
             getattr(index, method_name)()
+
+    def do_list(self, indices, no_confirm=False):
+        for index_cls in indices:
+            print("%s: %s.%s" % (
+                index_cls._meta.index,
+                index_cls.__module__, index_cls.__name__))
+
+        if not indices:
+            print("No index regstered.")
 
     def do_update(self, indices, no_confirm=False):
         self._call_indices(indices, 'update_index')

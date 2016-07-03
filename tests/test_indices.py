@@ -1,5 +1,4 @@
 import unittest
-import datetime
 
 import django
 from django.conf import settings
@@ -10,19 +9,21 @@ settings.configure(**{
 
 django.setup()
 
-from django.db import models
-from elasticsearch_dsl import String
-import springy
+from django.db import models  # NOQA
+from elasticsearch_dsl import String  # NOQA
+import springy  # NOQA
 
 
 class MyModel(models.Model):
     test_field = models.CharField(max_length=100)
+
     class Meta:
         app_label = 'test'
 
 
 class RelatedModel(models.Model):
     test_related_field = models.CharField(max_length=100)
+
     class Meta:
         app_label = 'test'
 
@@ -119,7 +120,9 @@ class IndexRegistryTestCase(unittest.TestCase):
                 fields = ('test_field',)
                 model = MyModel
 
-        self.assertEqual(springy.registry.get('tests.test_indices_MyTestIndex'), MyTestIndex)
+        self.assertEqual(
+                springy.registry.get('tests_mytestindex'),
+                MyTestIndex)
 
     def test_successul_unregistering_by_class(self):
         class MyTestIndex(springy.Index):
@@ -155,8 +158,6 @@ class IndexRegistryTestCase(unittest.TestCase):
             springy.registry.register('index', MyTestIndex)
 
     def test_successful_registering_same_index_class_with_other_name(self):
-        from springy.indices import AlreadyRegisteredError
-
         class MyTestIndex(springy.Index):
             class Meta:
                 fields = ('test_field',)
@@ -174,4 +175,3 @@ class IndexRegistryTestCase(unittest.TestCase):
 
         springy.registry.unregister(MyTestIndex)
         self.assertEqual(len(springy.registry.get_all()), 0)
-

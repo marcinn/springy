@@ -46,7 +46,12 @@ def index_to_string(x):
 
 
 def generate_index_name(cls):
-    return '%s_%s' % (cls.__module__, cls.__name__)
+    module_parts = cls.__module__.split('.')
+    try:
+        module_name = module_parts[-2]
+    except IndexError:
+        module_name = module_parts[0]
+    return '%s_%s' % (module_name.lower(), cls.__name__.lower())
 
 
 def autodiscover(module_name='search'):
