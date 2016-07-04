@@ -41,8 +41,11 @@ class PreparingDocTypeTestCase(unittest.TestCase):
         self.obj = MyModel(test_field='test value')
 
         class SpecialFieldAttributeErrorIndex(springy.Index):
+            test_field = String()
             special_field = String()
+            index = 'special'
 
+        class SpecialFieldAttributeErrorIndexer(springy.Indexer):
             class Meta:
                 fields = ('test_field', 'special_field',)
                 model = MyModel

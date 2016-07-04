@@ -71,6 +71,26 @@ class Document(DocType):
         return cls._doc_type.mapping.properties._params['properties']
 
 
+def doctype_factory(index):
+    class_name = '%sDocument' % index.__class__.name
+
+    fields = index._meta.declared_fields
+
+    parent = (object,)
+    Meta = type(str('Meta'), parent, {
+        'index': index._meta.index,
+        })
+
+    attrs = {
+            'Meta': Meta,
+            }
+
+    for field_name in fields:
+        attrs[field_name] = index._meta._declared_fields[field_name]
+
+    return type(Document)(class_name, (Document,), attrs)
+
+
 def model_doctype_factory(model, index, fields=None, exclude=None):
     class_name = '%sDocument' % model._meta.object_name
 

@@ -23,7 +23,7 @@ def index(name):
     """
     Shortcut to getting and instantiate index class from registry
     """
-    return registry.get(name)()
+    return registry.get(name)
 
 
 def model_indices(model_class):

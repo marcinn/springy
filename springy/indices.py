@@ -1,7 +1,7 @@
 from collections import defaultdict
 import itertools
 
-from .connections import get_connection_for_doctype
+from .connections import get_connection_for_doctype, get_connection_for_index
 from .fields import Field
 from .utils import model_to_dict, generate_index_name
 from .search import IterableSearch
@@ -20,6 +20,7 @@ class NotRegisteredError(KeyError):
 class IndicesRegistry(object):
     def __init__(self):
         self._indices = {}
+        self._indexers = defaultdict(list)
         self._model_indices = defaultdict(list)
 
     def register(self, name, cls):
@@ -30,13 +31,21 @@ class IndicesRegistry(object):
             raise AlreadyRegisteredError(
                     'Index `%s` is already registered' % name)
 
-        self._indices[name] = cls
+        index = cls(indexers=self._indexers[name])
+        self._indexers[name] = []
 
-        try:
-            self._model_indices[cls.model].append(cls)
-        except:
-            del self._indices[name]
-            raise
+        self._indices[name] = index
+
+    def register_indexer(self, index_name, cls):
+        if cls in self._indexers[index_name]:
+            raise AlreadyRegisteredError(
+                    'Indexer `%s` is already registered' % cls)
+        if index_name in self._indices:
+            self._indices[index_name].add_indexer(cls)
+        else:
+            self._indexers[index_name].append(cls)
+
+        self._model_indices[cls.model].append(index_name)
 
     def get(self, name):
         try:
@@ -48,7 +57,7 @@ class IndicesRegistry(object):
         return self._indices.values()
 
     def get_for_model(self, model):
-        return self._model_indices[model][:]  # shallow copy
+        return map(self.get, self._model_indices[model])
 
     def unregister(self, cls):
         to_unregister = []
@@ -62,9 +71,11 @@ class IndicesRegistry(object):
 
         for name in to_unregister:
             del self._indices[name]
+            del self._indexers[name]
 
     def unregister_all(self):
         self._indices = {}
+        self._indexers = defaultdict(list)
         self._model_indices = defaultdict(list)
 
 
@@ -73,13 +84,38 @@ registry = IndicesRegistry()
 
 class IndexOptions(object):
     def __init__(self, meta, declared_fields):
-        self.document = getattr(meta, 'document', None)
         self.optimize_query = getattr(meta, 'optimize_query', False)
         self.index = getattr(meta, 'index', None)
         self.read_consistency = getattr(meta, 'read_consistency', 'quorum')
         self.write_consistency = getattr(meta, 'write_consistency', 'quorum')
-        self._field_names = getattr(meta, 'fields', None) or []
         self._declared_fields = declared_fields
+
+
+"""
+class ModelIndexOptions(object):
+    def __init__(self, meta, declared_fields):
+        self.optimize_query = getattr(meta, 'optimize_query', False)
+        self.document = getattr(meta, 'document', None)
+        self.model = getattr(meta, 'model')
+        self.index = getattr(meta, 'index', None)
+        self.read_consistency = getattr(meta, 'read_consistency', 'quorum')
+        self.write_consistency = getattr(meta, 'write_consistency', 'quorum')
+        self._declared_fields = declared_fields
+
+    def setup_doctype(self, meta, index):
+        self.document = model_doctype_factory(
+                meta.model, index,
+                fields=getattr(meta, 'fields', None),
+                exclude=getattr(meta, 'exclude', None))
+"""
+
+
+class ModelIndexerOptions(object):
+    def __init__(self, meta):
+        self.document = getattr(meta, 'document', None)
+        self.index = getattr(meta, 'index')
+        self.model = getattr(meta, 'model')
+        self._field_names = getattr(meta, 'fields', None) or []
 
     def setup_doctype(self, meta, index):
         self.document = model_doctype_factory(
@@ -108,13 +144,35 @@ class IndexBase(type):
                 declared_fields[_attrname] = _attr
 
         setattr(new_class, '_meta', IndexOptions(meta, declared_fields))
-        setattr(new_class, 'model', getattr(meta, 'model', None))
 
         index_name = new_class._meta.index or generate_index_name(new_class)
         new_class._meta.index = index_name
 
-        if not new_class._meta.document:
-            new_class._meta.setup_doctype(meta, new_class)
+        setattr(new_class, '_schema', Schema(declared_fields))
+
+        registry.register(index_name, new_class)
+        return new_class
+
+
+class ModelIndexerBase(type):
+    def __new__(cls, name, bases, attrs):
+        super_new = super(ModelIndexerBase, cls).__new__
+
+        parents = [b for b in bases if isinstance(b, ModelIndexerBase)]
+        if not parents:
+            return super_new(cls, name, bases, attrs)
+
+        new_class = super_new(cls, name, bases, attrs)
+
+        meta = attrs.pop('Meta', None)
+        if not meta:
+            meta = getattr(new_class, 'Meta', None)
+
+        setattr(new_class, '_meta', ModelIndexerOptions(meta))
+
+        if isinstance(new_class._meta.index, Index):
+            # get index name to defer initialization
+            new_class._meta.index = new_class._meta.index._meta.index
 
         setattr(new_class, '_schema', Schema(
             new_class._meta.document.get_all_fields()))
@@ -125,44 +183,32 @@ class IndexBase(type):
                 raise FieldDoesNotExist(
                         'Field `%s` is not defined' % fieldname)
 
-        registry.register(index_name, new_class)
-
+        registry.register_indexer(new_class._meta.index, new_class)
         return new_class
 
 
 class Index(object):
     __metaclass__ = IndexBase
 
+    def __init__(self, indexers):
+        self.indexers = indexers
+
     @property
     def name(self):
         return self._meta.index
-
-    def get_query_set(self):
-        """
-        Return queryset for indexing
-        """
-        return self.model._default_manager.all()
 
     def get_search_object(self):
         """
         Return search object instance
         """
-        return IterableSearch(index=self._meta.document._doc_type.index)
+        return IterableSearch(index=self._meta.index)
 
     def initialize(self, using=None):
         """
         Initialize / update doctype
         """
-        self._meta.document.init(using=using)
-
-    def create(self, datadict, meta=None):
-        """
-        Create document instance based on arguments
-        """
-        datadict['meta'] = meta or {}
-        document = self._meta.document(**datadict)
-        document.full_clean()
-        return document
+        for indexer in self.indexers:
+            indexer.initialize(using=using)
 
     def query(self, *args, **kw):
         """
@@ -190,37 +236,72 @@ class Index(object):
         """
         return self.get_search_object()
 
-    def to_doctype(self, obj):
-        """
-        Convert model instance to ElasticSearch document
-        """
-        data = model_to_dict(obj)
-        for field_name in self._meta._field_names:
-            prepared_field_name = 'prepare_%s' % field_name
-            if hasattr(self, prepared_field_name):
-                data[field_name] = getattr(self, prepared_field_name)(obj)
-        meta = {'id': obj.pk}
-        return self.create(data, meta=meta)
+    def clear_index(self, using=None, consistency=None):
+        from elasticsearch.helpers import scan, bulk
+        connection = get_connection_for_index(self._meta.index, using=using)
+        objs = scan(connection, _source_include=['__non_existent_field__'])
+        index_name = self._meta.index
 
-    def delete(self, obj, fail_silently=False):
-        """
-        Delete document that represents specified `obj` instance.
+        def document_to_action(x):
+            x['_op_type'] = 'delete'
+            return x
 
-        Raise DocumentDoesNotExist exception when document does not exist.
-        When `fail_silently` set to true, DocumentDoesNotExist will be
-        silenced.
+        actions = itertools.imap(document_to_action, objs)
+        consistency = consistency or self._meta.write_consistency
+        bulk(
+            connection, actions, index=index_name, consistency=consistency,
+            refresh=True)
+
+    def drop_index(self, using=None):
+        from elasticsearch.client.indices import IndicesClient
+        connection = get_connection_for_index(self._meta.index, using=using)
+        return IndicesClient(connection).delete(self._meta.index)
+
+
+class Indexer(object):
+    def __init__(self, index):
+        self.index = index
+
+
+class ModelIndexer(Indexer):
+    __metaclass__ = ModelIndexerBase
+
+    def get_query_set(self):
+        """
+        Return queryset for indexing
+        """
+        return self.model._default_manager.all()
+
+    def create_document(self, data, meta=None):
+        """
+        Create document instance based on arguments
         """
 
-        from elasticsearch.exceptions import NotFoundError
-        doc = self.to_doctype(obj)
+        data = dict(data)
+        data['meta'] = meta or {}
+        document = self._meta.document(**data)
+        document.full_clean()
+        return document
+
+    def update(self, obj):
+        """
+        Perform create/update document only if matching indexing queryset
+        """
 
         try:
-            doc.delete()
-        except NotFoundError:
-            if not fail_silently:
-                raise DocumentDoesNotExist(
-                    'Document `%s` (id=%s) does not exists in index `%s`' % (
-                        doc._doc_type.name, doc.meta.id, self.name))
+            obj = self.get_query_set().filter(pk=obj.pk)[0]
+        except IndexError:
+            pass
+        else:
+            self.save(obj)
+
+    def update_queryset(self, queryset):
+        """
+        Perform create/update of queryset but narrowed with indexing queryset
+        """
+        qs = self.get_query_set()
+        qs.query.combine(queryset.query, 'and')
+        return self.save_many(qs)
 
     def save(self, obj, force=False):
         doc = self.to_doctype(obj)
@@ -248,56 +329,94 @@ class Index(object):
             return data
 
         actions = itertools.imap(document_to_action, generate_qs())
-        consistency = consistency or self._meta.write_consistency
+        consistency = consistency or self.index._meta.write_consistency
 
         return bulk(
                 connection, actions, index=index_name, doc_type=doctype_name,
                 consistency=consistency, refresh=True)[0]
-
-    def update(self, obj):
-        """
-        Perform create/update document only if matching indexing queryset
-        """
-
-        try:
-            obj = self.get_query_set().filter(pk=obj.pk)[0]
-        except IndexError:
-            pass
-        else:
-            self.save(obj)
-
-    def update_queryset(self, queryset):
-        """
-        Perform create/update of queryset but narrowed with indexing queryset
-        """
-        qs = self.get_query_set()
-        qs.query.combine(queryset.query, 'and')
-        return self.save_many(qs)
 
     def update_index(self, using=None, consistency=None):
         self.save_many(
                 self.get_query_set(), using=using,
                 consistency=consistency)
 
-    def clear_index(self, using=None, consistency=None):
-        from elasticsearch.helpers import scan, bulk
-        connection = get_connection_for_doctype(
-                self._meta.document, using=using)
-        objs = scan(connection, _source_include=['__non_existent_field__'])
-        index_name = self._meta.document._doc_type.index
+    def delete(self, obj, fail_silently=False):
+        """
+        Delete document that represents specified `data` instance.
 
-        def document_to_action(x):
-            x['_op_type'] = 'delete'
-            return x
+        Raise DocumentDoesNotExist exception when document does not exist.
+        When `fail_silently` set to true, DocumentDoesNotExist will be
+        silenced.
+        """
 
-        actions = itertools.imap(document_to_action, objs)
-        consistency = consistency or self._meta.write_consistency
-        bulk(
-                connection, actions, index=index_name, consistency=consistency,
-                refresh=True)
+        from elasticsearch.exceptions import NotFoundError
+        doc = self.to_doctype(obj)
 
-    def drop_index(self, using=None):
-        from elasticsearch.client.indices import IndicesClient
-        connection = get_connection_for_doctype(
-                self._meta.document, using=using)
-        return IndicesClient(connection).delete(self._meta.index)
+        try:
+            doc.delete()
+        except NotFoundError:
+            if not fail_silently:
+                raise DocumentDoesNotExist(
+                    'Document `%s` (id=%s) does not exists in index `%s`' % (
+                        doc._doc_type.name, doc.meta.id, self.name))
+
+    def initialize(self, using=None):
+        self._meta.document.init(using=using)
+
+    def to_doctype(self, obj):
+        """
+        Convert model instance to ElasticSearch document
+        """
+        data = model_to_dict(obj)
+        for field_name in self._meta._field_names:
+            prepared_field_name = 'prepare_%s' % field_name
+            if hasattr(self, prepared_field_name):
+                data[field_name] = getattr(self, prepared_field_name)(obj)
+        meta = {'id': obj.pk}
+        return self.create_document(data, meta=meta)
+
+"""
+
+class ModelIndexBase(type):
+    def __new__(cls, name, bases, attrs):
+        super_new = super(ModelIndexBase, cls).__new__
+
+        parents = [b for b in bases if isinstance(b, ModelIndexBase)]
+        if not parents:
+            return super_new(cls, name, bases, attrs)
+
+        new_class = super_new(cls, name, bases, attrs)
+
+        meta = attrs.pop('Meta', None)
+        if not meta:
+            meta = getattr(new_class, 'Meta', None)
+
+        declared_fields = {}
+        for _attrname, _attr in new_class.__dict__.items():
+            if isinstance(_attr, Field):
+                declared_fields[_attrname] = _attr
+
+        setattr(new_class, '_meta', ModelIndexOptions(meta, declared_fields))
+
+        if not new_class._meta.document:
+            new_class._meta.setup_doctype(meta, new_class)
+
+        index_name = new_class._meta.index or generate_index_name(new_class)
+        new_class._meta.index = index_name
+
+        setattr(new_class, '_schema', Schema(
+            new_class._meta.document.get_all_fields()))
+
+        schema_fields = new_class._schema.get_field_names()
+        for fieldname in new_class._meta._field_names:
+            if fieldname not in schema_fields:
+                raise FieldDoesNotExist(
+                        'Field `%s` is not defined' % fieldname)
+
+        registry.register(index_name, new_class)
+        return new_class
+
+
+class ModelIndex(Index, ModelIndexer):
+    __metaclass__ = ModelIndexBase
+"""
