@@ -1,4 +1,4 @@
-from elasticsearch_dsl import Search as BaseSearch
+from elasticsearch_dsl import Search as BaseSearch, Q
 
 
 class IterableSearch(BaseSearch):
@@ -22,6 +22,9 @@ class IterableSearch(BaseSearch):
 
     def parse(self, query):
         return self.query('query_string', query=query, use_dis_max=True)
+
+    def raw(self, raw_dict):
+        return self.update_from_dict(raw_dict)
 
 
 class Search(IterableSearch):

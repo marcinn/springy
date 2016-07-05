@@ -162,6 +162,9 @@ class Index(object):
         document.full_clean()
         return document
 
+    def raw(self, data):
+        return self.get_search_object().raw(data)
+
     def query(self, *args, **kw):
         """
         Query index
