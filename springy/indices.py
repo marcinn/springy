@@ -73,7 +73,8 @@ registry = IndicesRegistry()
 
 class IndexOptions(object):
     def __init__(self, meta, declared_fields):
-        self.document = getattr(meta, 'document', None)
+        self.document = getattr(meta, 'document', None)  # DocType instance
+        self.doc_type = getattr(meta, 'doc_type', None)  # doc_type name
         self.optimize_query = getattr(meta, 'optimize_query', False)
         self.index = getattr(meta, 'index', None)
         self.read_consistency = getattr(meta, 'read_consistency', 'quorum')

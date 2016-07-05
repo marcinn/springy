@@ -175,3 +175,13 @@ class IndexRegistryTestCase(unittest.TestCase):
         springy.registry.unregister(MyTestIndex)
         self.assertEqual(len(springy.registry.get_all()), 0)
 
+    def test_successful_registering_index_with_custom_doctype(self):
+        class MyTestIndex(springy.Index):
+            class Meta:
+                fields = ('test_field',)
+                doc_type = 'custom_doc'
+                model = MyModel
+
+        self.assertEqual(
+                springy.registry.get_all()[0]._meta.document._doc_type.name,
+                'custom_doc')
