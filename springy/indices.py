@@ -4,7 +4,7 @@ import itertools
 from .connections import get_connection_for_doctype
 from .fields import Field
 from .utils import model_to_dict, generate_index_name
-from .search import IterableSearch
+from .search import IterableSearch, MultiSearch
 from .schema import model_doctype_factory, Schema
 from .exceptions import DocumentDoesNotExist, FieldDoesNotExist
 
@@ -191,6 +191,12 @@ class Index(object):
         Return all documents query
         """
         return self.get_search_object()
+
+    def multisearch(self, queries=None):
+        """
+        Create MultiSearch object
+        """
+        return MultiSearch(self, queries=queries)
 
     def to_doctype(self, obj):
         """

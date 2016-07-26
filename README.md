@@ -68,6 +68,8 @@ Available methods:
 * `springy.autodiscover()` - find and register search indices in whole Django project
 * `springy.index(name)` - retrieve `Index` instance by its name
 * `springy.query(*indices)` - query specified indices by their names, returns `Search` lazy object
+* `springy.multisearch(index_name=None)` - construct MultiSearch object
+  with optional index to perform multisearch queries
 * `springy.parse(input_query_string)` - instantiate `Search` with DisMax query parser for specified input
 
 ## Autodiscover and index registration

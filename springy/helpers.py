@@ -1,4 +1,4 @@
-from .search import Search
+from .search import Search, MultiSearch
 from .utils import index_to_string
 from .indices import registry
 
@@ -17,6 +17,10 @@ def query(*indices):
 
 def parse(query_string):
     return query().parse(query_string)
+
+
+def multisearch(index_name=None):
+    return MultiSearch(index=index(index_name) if index_name else None)
 
 
 def index(name):

@@ -1,4 +1,7 @@
-from elasticsearch_dsl import Search as BaseSearch, Q
+from elasticsearch_dsl import (
+        Search as BaseSearch,
+        MultiSearch as BaseMultiSearch,
+        )
 
 
 class IterableSearch(BaseSearch):
@@ -29,3 +32,35 @@ class IterableSearch(BaseSearch):
 
 class Search(IterableSearch):
     pass
+
+
+class MultiSearch(object):
+    def __init__(self, index=None, queries=None):
+        self.index = index
+        self._queries = BaseMultiSearch(
+                index=self.index._meta.index if index else None)
+
+        for query in queries or []:
+            self.add(query)
+
+    def raw(self, raw_dict):
+        return Search().raw(raw_dict)
+
+    def filter(self, *args, **kw):
+        return Search().filter(*args, **kw)
+
+    def query(self, *args, **kw):
+        return Search().query(*args, **kw)
+
+    def add(self, *queries):
+        for query in queries:
+            self._queries = self._queries.add(query)
+
+    def execute(self):
+        return self._queries.execute()
+
+    def __iter__(self):
+        return iter(self.execute())
+
+    def __len__(self):
+        return len(self._queries)

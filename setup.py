@@ -20,7 +20,7 @@ setup(
     license="BSD",
     url="https://github.com/marcinn/springy",
     long_description='',
-    version='0.3.5',
+    version='0.3.6',
     author="Marcin Nowak",
     author_email="marcin.j.nowak@gmail.com",
     packages=find_packages(
