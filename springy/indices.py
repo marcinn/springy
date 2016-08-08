@@ -234,7 +234,10 @@ class Index(object):
         doc = self.to_doctype(obj)
         doc.save()
 
-    def save_many(self, objects, using=None, consistency=None):
+    def save_many(
+            self, objects, using=None, consistency=None, chunk_size=100,
+            request_timeout=30):
+
         from elasticsearch.helpers import bulk
 
         def generate_qs():
@@ -260,7 +263,8 @@ class Index(object):
 
         return bulk(
                 connection, actions, index=index_name, doc_type=doctype_name,
-                consistency=consistency, refresh=True)[0]
+                consistency=consistency, refresh=True, chunk_size=chunk_size,
+                request_timeout=request_timeout)[0]
 
     def update(self, obj):
         """
@@ -282,10 +286,13 @@ class Index(object):
         qs.query.combine(queryset.query, 'and')
         return self.save_many(qs)
 
-    def update_index(self, using=None, consistency=None):
+    def update_index(
+            self, using=None, consistency=None, chunk_size=100,
+            request_timeout=30):
         self.save_many(
                 self.get_query_set(), using=using,
-                consistency=consistency)
+                consistency=consistency, chunk_size=chunk_size,
+                request_timeout=request_timeout)
 
     def clear_index(self, using=None, consistency=None):
         from elasticsearch.helpers import scan, bulk
