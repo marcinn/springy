@@ -1,12 +1,15 @@
 from collections import defaultdict
 import itertools
 
+from elasticsearch_dsl import Index as DSLIndex
+
 from .connections import get_connection_for_doctype
 from .fields import Field
 from .utils import model_to_dict, generate_index_name
 from .search import IterableSearch, MultiSearch
 from .schema import model_doctype_factory, Schema
 from .exceptions import DocumentDoesNotExist, FieldDoesNotExist
+from . import settings
 
 
 class AlreadyRegisteredError(Exception):
@@ -75,6 +78,7 @@ class IndexOptions(object):
     def __init__(self, meta, declared_fields):
         self.document = getattr(meta, 'document', None)  # DocType instance
         self.doc_type = getattr(meta, 'doc_type', None)  # doc_type name
+        self.meta = getattr(meta, 'index_meta', None)
         self.optimize_query = getattr(meta, 'optimize_query', False)
         self.index = getattr(meta, 'index', None)
         self.read_consistency = getattr(meta, 'read_consistency', 'quorum')
@@ -152,6 +156,12 @@ class Index(object):
         """
         Initialize / update doctype
         """
+        meta = dict(settings.INDEX_DEFAULTS)
+        meta.update(self._meta.meta or {})
+        _idx = DSLIndex(self._meta.document._doc_type.index)
+        _idx.settings(**meta)
+        _idx.create()
+
         self._meta.document.init(using=using)
 
     def create(self, datadict, meta=None):
