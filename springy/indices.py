@@ -9,7 +9,6 @@ from .utils import model_to_dict, generate_index_name
 from .search import IterableSearch, MultiSearch
 from .schema import model_doctype_factory, Schema
 from .exceptions import DocumentDoesNotExist, FieldDoesNotExist
-from . import settings
 
 
 class AlreadyRegisteredError(Exception):
@@ -156,7 +155,8 @@ class Index(object):
         """
         Initialize / update doctype
         """
-        meta = dict(settings.INDEX_DEFAULTS)
+        from .settings import INDEX_DEFAULTS
+        meta = dict(INDEX_DEFAULTS)
         meta.update(self._meta.meta or {})
         _idx = DSLIndex(self._meta.document._doc_type.index)
         _idx.settings(**meta)
