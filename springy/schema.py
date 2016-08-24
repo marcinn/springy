@@ -106,13 +106,13 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
 
     for field_name in fields:
         try:
-            attrs[field_name] = doctype_field_factory(
-                model._meta.get_field_by_name(field_name)[0])
-        except FieldDoesNotExist:
+            attrs[field_name] = index._meta._declared_fields[field_name]
+        except KeyError:
             try:
-                attrs[field_name] = index._meta._declared_fields[field_name]
-            except KeyError:
-                pass
+                attrs[field_name] = doctype_field_factory(
+                    model._meta.get_field_by_name(field_name)[0])
+            except FieldDoesNotExist:
+                raise FieldDoesNotExist('Field %s is not defined' % field_name)
 
     return type(Document)(class_name, (Document,), attrs)
 
