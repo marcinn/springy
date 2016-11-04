@@ -51,7 +51,10 @@ class Command(BaseCommand):
     def _call_indices(self, indices, method_name, **kwargs):
         for index_cls in indices:
             index = index_cls()
-            getattr(index, method_name)(**kwargs)
+            try:
+                getattr(index, method_name)(**kwargs)
+            except Exception as ex:
+                print('%s: %s' % ( index.name, ex))
 
     def do_update(self, indices, no_confirm=False):
         self._call_indices(
