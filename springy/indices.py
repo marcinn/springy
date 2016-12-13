@@ -5,7 +5,7 @@ from .connections import get_connection_for_doctype, get_connection_for_index
 from .fields import Field
 from .utils import model_to_dict, generate_index_name
 from .search import IterableSearch
-from .schema import model_doctype_factory, Schema
+from .schema import model_doctype_factory, doctype_factory, Schema
 from .exceptions import DocumentDoesNotExist, FieldDoesNotExist
 
 
@@ -31,7 +31,9 @@ class IndicesRegistry(object):
             raise AlreadyRegisteredError(
                     'Index `%s` is already registered' % name)
 
-        index = cls(indexers=self._indexers[name])
+        index = cls()
+        for indexer in self._indexers[name]:
+            index.add_indexer(indexer)
         self._indexers[name] = []
 
         self._indices[name] = index
@@ -40,12 +42,14 @@ class IndicesRegistry(object):
         if cls in self._indexers[index_name]:
             raise AlreadyRegisteredError(
                     'Indexer `%s` is already registered' % cls)
-        if index_name in self._indices:
-            self._indices[index_name].add_indexer(cls)
         else:
-            self._indexers[index_name].append(cls)
+            if index_name in self._indices:
+                self._indices[index_name].add_indexer(cls)
+            else:
+                self._indexers[index_name].append(cls)
 
-        self._model_indices[cls.model].append(index_name)
+        if isinstance(cls, ModelIndexer):
+            self._model_indices[cls.model].append(index_name)
 
     def get(self, name):
         try:
@@ -85,11 +89,17 @@ registry = IndicesRegistry()
 class IndexOptions(object):
     def __init__(self, meta, declared_fields):
         self.optimize_query = getattr(meta, 'optimize_query', False)
-        self.index = getattr(meta, 'index', None)
+        self.index = getattr(meta, 'name', None)
         self.read_consistency = getattr(meta, 'read_consistency', 'quorum')
         self.write_consistency = getattr(meta, 'write_consistency', 'quorum')
         self._declared_fields = declared_fields
 
+    @property
+    def fields(self):
+        return self._declared_fields
+
+    def get_field_by_name(self, name):
+        return self._declared_fields[name]
 
 """
 class ModelIndexOptions(object):
@@ -110,12 +120,17 @@ class ModelIndexOptions(object):
 """
 
 
-class ModelIndexerOptions(object):
+class IndexerOptions(object):
     def __init__(self, meta):
         self.document = getattr(meta, 'document', None)
         self.index = getattr(meta, 'index')
-        self.model = getattr(meta, 'model')
         self._field_names = getattr(meta, 'fields', None) or []
+
+
+class ModelIndexerOptions(IndexerOptions):
+    def __init__(self, meta):
+        super(ModelIndexerOptions, self).__init__(meta)
+        self.model = getattr(meta, 'model')
 
     def setup_doctype(self, meta, index):
         self.document = model_doctype_factory(
@@ -132,9 +147,9 @@ class IndexBase(type):
         if not parents:
             return super_new(cls, name, bases, attrs)
 
+        meta = attrs.pop('Meta', None)
         new_class = super_new(cls, name, bases, attrs)
 
-        meta = attrs.pop('Meta', None)
         if not meta:
             meta = getattr(new_class, 'Meta', None)
 
@@ -142,6 +157,7 @@ class IndexBase(type):
         for _attrname, _attr in new_class.__dict__.items():
             if isinstance(_attr, Field):
                 declared_fields[_attrname] = _attr
+                delattr(new_class, _attrname)
 
         setattr(new_class, '_meta', IndexOptions(meta, declared_fields))
 
@@ -154,23 +170,62 @@ class IndexBase(type):
         return new_class
 
 
-class ModelIndexerBase(type):
+class IndexerBase(type):
+
+    def __new__(cls, name, bases, attrs):
+        super_new = super(IndexerBase, cls).__new__
+
+        parents = [b for b in bases if isinstance(b, IndexerBase)]
+        if not parents or cls is ModelIndexerBase:
+            return super_new(cls, name, bases, attrs)
+
+        meta = attrs.pop('Meta', None)
+        new_class = super_new(cls, name, bases, attrs)
+
+        if not meta:
+            meta = getattr(new_class, 'Meta', None)
+
+        setattr(new_class, '_meta', IndexerOptions(meta))
+
+        if isinstance(new_class._meta.index, (Index, IndexBase)):
+            # get index name to defer initialization
+            new_class._meta.index = new_class._meta.index._meta.index
+
+        index_obj = registry.get(new_class._meta.index)
+
+        if not new_class._meta.document:
+            new_class._meta.document = index_obj.as_doctype()
+
+        setattr(new_class, '_schema', Schema(
+            new_class._meta.document.get_all_fields()))
+
+        schema_fields = new_class._schema.get_field_names()
+        for fieldname in new_class._meta._field_names:
+            if fieldname not in schema_fields:
+                raise FieldDoesNotExist(
+                        'Field `%s` is not defined' % fieldname)
+
+        registry.register_indexer(new_class._meta.index, new_class)
+        return new_class
+
+
+class ModelIndexerBase(IndexerBase):
     def __new__(cls, name, bases, attrs):
         super_new = super(ModelIndexerBase, cls).__new__
 
         parents = [b for b in bases if isinstance(b, ModelIndexerBase)]
-        if not parents:
+        if not parents or Indexer in bases:
             return super_new(cls, name, bases, attrs)
 
+        meta = attrs.pop('Meta', None)
         new_class = super_new(cls, name, bases, attrs)
 
-        meta = attrs.pop('Meta', None)
         if not meta:
             meta = getattr(new_class, 'Meta', None)
 
         setattr(new_class, '_meta', ModelIndexerOptions(meta))
 
-        if isinstance(new_class._meta.index, Index):
+        if isinstance(new_class._meta.index, (Index, IndexBase)):
             # get index name to defer initialization
             new_class._meta.index = new_class._meta.index._meta.index
 
@@ -190,8 +245,8 @@ class ModelIndexerBase(type):
 class Index(object):
     __metaclass__ = IndexBase
 
-    def __init__(self, indexers):
-        self.indexers = indexers
+    def __init__(self):
+        self.indexers = []
 
     @property
     def name(self):
@@ -257,20 +312,18 @@ class Index(object):
         connection = get_connection_for_index(self._meta.index, using=using)
         return IndicesClient(connection).delete(self._meta.index)
 
+    def as_doctype(self):
+        return doctype_factory(self)
+
+    def add_indexer(self, indexer):
+        self.indexers.append(indexer(self))
+
 
 class Indexer(object):
+    __metaclass__ = IndexerBase
+
     def __init__(self, index):
         self.index = index
-
-
-class ModelIndexer(Indexer):
-    __metaclass__ = ModelIndexerBase
-
-    def get_query_set(self):
-        """
-        Return queryset for indexing
-        """
-        return self.model._default_manager.all()
 
     def create_document(self, data, meta=None):
         """
@@ -282,6 +335,33 @@ class ModelIndexer(Indexer):
         document = self._meta.document(**data)
         document.full_clean()
         return document
+
+    def initialize(self, using=None):
+        self._meta.document.init(using=using)
+
+    def save_document(self, document, using=None):
+        document.save(using=using)
+
+    def delete_document(self, document, using=None):
+        document.delete(using=using)
+
+    def iterator(self):
+        raise NotImplementedError
+
+    def reindex(self, using=None):
+        for row in self.iterator():
+            doc = self.create_document(row)
+            self.save_document(doc, using=using)
+
+
+class ModelIndexer(Indexer):
+    __metaclass__ = ModelIndexerBase
+
+    def get_query_set(self):
+        """
+        Return queryset for indexing
+        """
+        return self.model._default_manager.all()
 
     def update(self, obj):
         """
@@ -359,9 +439,6 @@ class ModelIndexer(Indexer):
                 raise DocumentDoesNotExist(
                     'Document `%s` (id=%s) does not exists in index `%s`' % (
                         doc._doc_type.name, doc.meta.id, self.name))
-
-    def initialize(self, using=None):
-        self._meta.document.init(using=using)
 
     def to_doctype(self, obj):
         """

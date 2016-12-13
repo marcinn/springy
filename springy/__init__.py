@@ -1,6 +1,7 @@
-from .indices import Index, ModelIndexer, registry  # NOQA
+from .indices import Index, Indexer, ModelIndexer, registry  # NOQA
 from .helpers import query, parse, index, model_indices  # NOQA
 from .utils import autodiscover  # NOQA
+from .schema import Document  # NOQA
 import exceptions  # NOQA
 
 default_app_config = 'springy.apps.SpringyAppConfig'

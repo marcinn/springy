@@ -72,9 +72,9 @@ class Document(DocType):
 
 
 def doctype_factory(index):
-    class_name = '%sDocument' % index.__class__.name
+    class_name = '%sDocument' % index.__class__.__name__
 
-    fields = index._meta.declared_fields
+    fields = index._meta._declared_fields
 
     parent = (object,)
     Meta = type(str('Meta'), parent, {

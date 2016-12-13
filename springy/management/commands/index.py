@@ -53,8 +53,7 @@ class Command(BaseCommand):
         func(index_classes, no_confirm=no_confirm)
 
     def _call_indices(self, indices, method_name):
-        for index_cls in indices:
-            index = index_cls()
+        for index in indices:
             getattr(index, method_name)()
 
     def do_list(self, indices, no_confirm=False):

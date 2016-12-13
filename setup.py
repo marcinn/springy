@@ -5,7 +5,8 @@ from setuptools import setup, find_packages
 
 
 install_requires = [
-    'elasticsearch-dsl>=0.0.9',
+    'elasticsearch>=2.0.0<3.0.0',
+    'elasticsearch-dsl>=0.0.9<3.0.0',
 ]
 
 tests_require = []

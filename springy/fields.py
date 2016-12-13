@@ -1,6 +1,7 @@
-from elasticsearch_dsl import (  # NOQA
+from elasticsearch_dsl.field import (  # NOQA
         String, Date, Integer, Boolean, Float,
-        Short, Byte, Long, Double, Field, Object, Nested)
+        Short, Byte, Long, Double, Field, Object, Nested,
+        GeoShape)
 
 
 MODEL_FIELDS_MAP = {
