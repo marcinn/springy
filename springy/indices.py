@@ -1,10 +1,12 @@
 from collections import defaultdict
 import itertools
 
+from elasticsearch_dsl import Index as DSLIndex
+
 from .connections import get_connection_for_doctype, get_connection_for_index
 from .fields import Field
 from .utils import model_to_dict, generate_index_name
-from .search import IterableSearch
+from .search import IterableSearch, MultiSearch
 from .schema import model_doctype_factory, doctype_factory, Schema
 from .exceptions import DocumentDoesNotExist, FieldDoesNotExist
 
@@ -88,6 +90,7 @@ registry = IndicesRegistry()
 
 class IndexOptions(object):
     def __init__(self, meta, declared_fields):
+        self.meta = getattr(meta, 'index_meta', None)
         self.optimize_query = getattr(meta, 'optimize_query', False)
         self.index = getattr(meta, 'name', None)
         self.read_consistency = getattr(meta, 'read_consistency', 'quorum')
@@ -265,6 +268,9 @@ class Index(object):
         for indexer in self.indexers:
             indexer.initialize(using=using)
 
+    def raw(self, data):
+        return self.get_search_object().raw(data)
+
     def query(self, *args, **kw):
         """
         Query index
@@ -290,6 +296,12 @@ class Index(object):
         Return all documents query
         """
         return self.get_search_object()
+
+    def multisearch(self, queries=None):
+        """
+        Create MultiSearch object
+        """
+        return MultiSearch(self, queries=queries)
 
     def clear_index(self, using=None, consistency=None):
         from elasticsearch.helpers import scan, bulk
@@ -337,6 +349,15 @@ class Indexer(object):
         return document
 
     def initialize(self, using=None):
+        from .settings import INDEX_DEFAULTS
+
+        meta = dict(INDEX_DEFAULTS)
+        meta.update(self.index._meta.meta or {})
+
+        _idx = DSLIndex(self._meta.document._doc_type.index)
+        _idx.settings(**meta)
+        _idx.create()
+
         self._meta.document.init(using=using)
 
     def save_document(self, document, using=None):
@@ -387,7 +408,10 @@ class ModelIndexer(Indexer):
         doc = self.to_doctype(obj)
         doc.save()
 
-    def save_many(self, objects, using=None, consistency=None):
+    def save_many(
+            self, objects, using=None, consistency=None, chunk_size=100,
+            request_timeout=30):
+
         from elasticsearch.helpers import bulk
 
         def generate_qs():
@@ -413,12 +437,16 @@ class ModelIndexer(Indexer):
 
         return bulk(
                 connection, actions, index=index_name, doc_type=doctype_name,
-                consistency=consistency, refresh=True)[0]
+                consistency=consistency, refresh=True, chunk_size=chunk_size,
+                request_timeout=request_timeout)[0]
 
-    def update_index(self, using=None, consistency=None):
+    def update_index(
+            self, using=None, consistency=None, chunk_size=100,
+            request_timeout=30):
         self.save_many(
                 self.get_query_set(), using=using,
-                consistency=consistency)
+                consistency=consistency, chunk_size=chunk_size,
+                request_timeout=request_timeout)
 
     def delete(self, obj, fail_silently=False):
         """
@@ -452,8 +480,8 @@ class ModelIndexer(Indexer):
         meta = {'id': obj.pk}
         return self.create_document(data, meta=meta)
 
-"""
 
+"""
 class ModelIndexBase(type):
     def __new__(cls, name, bases, attrs):
         super_new = super(ModelIndexBase, cls).__new__

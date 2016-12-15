@@ -101,9 +101,24 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
         fields = list(fields.difference(fields, set(exclude)))
 
     parent = (object,)
-    Meta = type(str('Meta'), parent, {
+    meta = {
         'index': index._meta.index,
-        })
+        }
+
+    if index._meta.doc_type:
+        # elasticsearch-dsl is written in a strange way.
+        # You can set empty/None as doc_type and it
+        # will get this value "as is".
+        #
+        # This is not "pythonic". Elasticsearch-dsl have
+        # more strange solutions implemented and it is
+        # not reliable. Avoid elasticsearch-dsl where possible.
+        #
+        # Springy will drop Elasticsearch-DSL dependency soon.
+
+        meta['doc_type'] = index._meta.doc_type
+
+    Meta = type(str('Meta'), parent, meta)
 
     attrs = {
             'Meta': Meta,
@@ -111,13 +126,13 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
 
     for field_name in fields:
         try:
-            attrs[field_name] = doctype_field_factory(
-                model._meta.get_field_by_name(field_name)[0])
-        except FieldDoesNotExist:
+            attrs[field_name] = index._meta._declared_fields[field_name]
+        except KeyError:
             try:
-                attrs[field_name] = index._meta._declared_fields[field_name]
-            except KeyError:
-                pass
+                attrs[field_name] = doctype_field_factory(
+                    model._meta.get_field_by_name(field_name)[0])
+            except FieldDoesNotExist:
+                raise FieldDoesNotExist('Field %s is not defined' % field_name)
 
     return type(Document)(class_name, (Document,), attrs)
 

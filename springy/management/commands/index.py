@@ -18,7 +18,14 @@ class Command(BaseCommand):
         parser.add_argument(
                 'index', nargs='*', type=str, metavar='INDEX',
                 help='Optional index names (default: all registered)')
-        parser.add_argument('--noconfirm', default=False, action='store_true')
+        parser.add_argument(
+                '--noconfirm', default=False, action='store_true')
+        parser.add_argument(
+                '-t', '--timeout', default=10, type=int,
+                help='Request timeout')
+        parser.add_argument(
+                '-c', '--chunk-size', default=100, type=int,
+                help='Chunk size')
 
     def _available_commands(self):
         commands = []
@@ -34,6 +41,8 @@ class Command(BaseCommand):
         command = kw.pop('command')
         indices = kw['index']
         no_confirm = kw['noconfirm']
+        self.timeout = kw['timeout']
+        self.chunk_size = kw['chunk_size']
 
         try:
             func = getattr(self, 'do_%s' % command)
@@ -54,7 +63,10 @@ class Command(BaseCommand):
 
     def _call_indices(self, indices, method_name):
         for index in indices:
-            getattr(index, method_name)()
+            try:
+                getattr(index, method_name)()
+            except Exception as ex:
+                print('%s: %s' % ( index.name, ex))
 
     def do_list(self, indices, no_confirm=False):
         for index_cls in indices:
@@ -66,7 +78,9 @@ class Command(BaseCommand):
             print("No index regstered.")
 
     def do_update(self, indices, no_confirm=False):
-        self._call_indices(indices, 'update_index')
+        self._call_indices(
+                indices, 'update_index', request_timeout=self.timeout,
+                chunk_size=self.chunk_size)
 
     def do_clear(self, indices, no_confirm=False):
         indices_list = u'\n'.join(map(lambda x: u'\t- %s' % x, indices))

@@ -19,7 +19,7 @@ def model_to_dict(obj, fields=None):
         field = obj._meta.get_field_by_name(field_name)[0]
         if getattr(field, 'is_relation', None) or getattr(
                 field, 'related', None):
-            if field.many_to_one or field.one_to_one:
+            if field.many_to_one:
                 value = getattr(obj, field_name+'_id')
             else:
                 continue

@@ -6,9 +6,11 @@ class SpringyAppConfig(AppConfig):
     verbose_name = 'Springy'
 
     def ready(self):
-        from .settings import DATABASES, AUTODISCOVER_MODULE
+        from .settings import DATABASES, AUTODISCOVER_MODULE, AUTODISCOVER
         from .utils import autodiscover
         from elasticsearch_dsl.connections import connections
 
         connections.configure(**DATABASES)
-        autodiscover(AUTODISCOVER_MODULE)
+
+        if AUTODISCOVER:
+            autodiscover(AUTODISCOVER_MODULE)
