@@ -128,10 +128,9 @@ class IndexerOptions(object):
         self.document = getattr(meta, 'document', None)
         self.index = getattr(meta, 'index')
         self._field_names = getattr(meta, 'fields', None) or []
-        self.index_obj = registry.get(self.index)
 
     def get_index_instance(self):
-        return self.index_obj
+        return registry.get(self.index)
 
 
 class ModelIndexerOptions(object):
@@ -140,10 +139,9 @@ class ModelIndexerOptions(object):
         self.index = getattr(meta, 'index')
         self.model = getattr(meta, 'model')
         self._field_names = getattr(meta, 'fields', None) or []
-        self.index_obj = registry.get(self.index)
 
     def get_index_instance(self):
-        return self.index_obj
+        return registry.get(self.index)
 
     def setup_doctype(self, meta, index):
         self.document = model_doctype_factory(
