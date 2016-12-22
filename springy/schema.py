@@ -91,7 +91,7 @@ def doctype_factory(index):
     return type(Document)(class_name, (Document,), attrs)
 
 
-def model_doctype_factory(model, index, fields=None, exclude=None):
+def model_doctype_factory(model, indexer, fields=None, exclude=None):
     class_name = '%sDocument' % model._meta.object_name
 
     fields = fields or [field.name for field in model._meta.get_fields()]
@@ -102,10 +102,10 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
 
     parent = (object,)
     meta = {
-        'index': index._meta.index,
+        'index': indexer._meta.index,
         }
 
-    if index._meta.doc_type:
+    if indexer._meta.document:
         # elasticsearch-dsl is written in a strange way.
         # You can set empty/None as doc_type and it
         # will get this value "as is".
@@ -116,7 +116,7 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
         #
         # Springy will drop Elasticsearch-DSL dependency soon.
 
-        meta['doc_type'] = index._meta.doc_type
+        meta['doc_type'] = indexer._meta.document
 
     Meta = type(str('Meta'), parent, meta)
 
@@ -124,9 +124,11 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
             'Meta': Meta,
             }
 
+    index = indexer._meta.get_index_instance()
+
     for field_name in fields:
         try:
-            attrs[field_name] = index._meta._declared_fields[field_name]
+            attrs[field_name] = index._meta.get_field_by_name(field_name)
         except KeyError:
             try:
                 attrs[field_name] = doctype_field_factory(

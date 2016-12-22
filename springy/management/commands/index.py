@@ -61,10 +61,10 @@ class Command(BaseCommand):
 
         func(index_classes, no_confirm=no_confirm)
 
-    def _call_indices(self, indices, method_name):
+    def _call_indices(self, indices, method_name, **kwargs):
         for index in indices:
             try:
-                getattr(index, method_name)()
+                getattr(index, method_name)(**kwargs)
             except Exception as ex:
                 print('%s: %s' % ( index.name, ex))
 
@@ -98,3 +98,6 @@ class Command(BaseCommand):
 
     def do_initialize(self, indices, no_confirm=False):
         self._call_indices(indices, 'initialize')
+
+    def do_initialize_once(self, indices, no_confirm=False):
+        self._call_indices(indices, 'initialize', skip_existing=True)

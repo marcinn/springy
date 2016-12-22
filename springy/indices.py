@@ -128,12 +128,22 @@ class IndexerOptions(object):
         self.document = getattr(meta, 'document', None)
         self.index = getattr(meta, 'index')
         self._field_names = getattr(meta, 'fields', None) or []
+        self.index_obj = registry.get(self.index)
+
+    def get_index_instance(self):
+        return self.index_obj
 
 
-class ModelIndexerOptions(IndexerOptions):
+class ModelIndexerOptions(object):
     def __init__(self, meta):
-        super(ModelIndexerOptions, self).__init__(meta)
+        self.document = getattr(meta, 'document', None)
+        self.index = getattr(meta, 'index')
         self.model = getattr(meta, 'model')
+        self._field_names = getattr(meta, 'fields', None) or []
+        self.index_obj = registry.get(self.index)
+
+    def get_index_instance(self):
+        return self.index_obj
 
     def setup_doctype(self, meta, index):
         self.document = model_doctype_factory(
@@ -232,6 +242,9 @@ class ModelIndexerBase(IndexerBase):
             # get index name to defer initialization
             new_class._meta.index = new_class._meta.index._meta.index
 
+        if not new_class._meta.document:
+            new_class._meta.setup_doctype(meta, new_class)
+
         setattr(new_class, '_schema', Schema(
             new_class._meta.document.get_all_fields()))
 
@@ -261,10 +274,13 @@ class Index(object):
         """
         return IterableSearch(index=self._meta.index)
 
-    def initialize(self, using=None):
+    def initialize(self, using=None, skip_existing=False):
         """
-        Initialize / update doctype
+        Initialize index and related doctypes
         """
+
+        self.create_index(using=using, skip_existing=skip_existing)
+
         for indexer in self.indexers:
             indexer.initialize(using=using)
 
@@ -319,6 +335,18 @@ class Index(object):
             connection, actions, index=index_name, consistency=consistency,
             refresh=True)
 
+    def create_index(self, using=None, skip_existing=False):
+        from .settings import INDEX_DEFAULTS
+
+        meta = dict(INDEX_DEFAULTS)
+        meta.update(self._meta.meta or {})
+
+        _idx = DSLIndex(self._meta.index)
+        _idx.settings(**meta)
+
+        if not skip_existing or not _idx.exists():
+            _idx.create()
+
     def drop_index(self, using=None):
         from elasticsearch.client.indices import IndicesClient
         connection = get_connection_for_index(self._meta.index, using=using)
@@ -349,15 +377,6 @@ class Indexer(object):
         return document
 
     def initialize(self, using=None):
-        from .settings import INDEX_DEFAULTS
-
-        meta = dict(INDEX_DEFAULTS)
-        meta.update(self.index._meta.meta or {})
-
-        _idx = DSLIndex(self._meta.document._doc_type.index)
-        _idx.settings(**meta)
-        _idx.create()
-
         self._meta.document.init(using=using)
 
     def save_document(self, document, using=None):
