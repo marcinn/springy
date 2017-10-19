@@ -175,7 +175,7 @@ BSD
 
 ## Changelog
 
-`0.3.10`
+`0.3.11`
 - Added support for Python 3 (Django 1.7.x only for Python 3.4)
 - Supported Django versions are 1.7, 1.8, 1.9, 1.10, 1.11
 
