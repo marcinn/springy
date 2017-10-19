@@ -1,8 +1,9 @@
 from django.core.management.base import BaseCommand, CommandError
+from builtins import input
 
 
 def confirm(question):
-    value = raw_input(question+' [y/n]')  # NOQA
+    value = input(question+' [y/n]')  # NOQA
     if value.strip().lower() == 'y':
         return True
 

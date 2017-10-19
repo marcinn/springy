@@ -1,12 +1,12 @@
 from collections import defaultdict
-import itertools
+from builtins import map as imap
 import six
 
 from elasticsearch_dsl import Index as DSLIndex
 
 from .connections import get_connection_for_doctype
 from .fields import Field
-from .utils import model_to_dict, generate_index_name
+from .utils import model_to_dict, generate_index_name, chunked
 from .search import IterableSearch, MultiSearch
 from .schema import model_doctype_factory, Schema
 from .exceptions import DocumentDoesNotExist, FieldDoesNotExist
@@ -252,9 +252,10 @@ class Index(object):
         from elasticsearch.helpers import bulk
 
         def generate_qs():
-            qs = iter(objects)
-            for item in qs:
-                yield self.to_doctype(item)
+            chunks = chunked(objects, chunk_size)
+            for chunk in chunks:
+                for item in chunk:
+                    yield self.to_doctype(item)
 
         doctype_name = self._meta.document._doc_type.name
         index_name = self._meta.document._doc_type.index
@@ -269,13 +270,13 @@ class Index(object):
                 data['_%s' % key] = val
             return data
 
-        actions = itertools.imap(document_to_action, generate_qs())
+        actions = imap(document_to_action, generate_qs())
         consistency = consistency or self._meta.write_consistency
 
         return bulk(
                 connection, actions, index=index_name, doc_type=doctype_name,
-                consistency=consistency, refresh=True, chunk_size=chunk_size,
-                request_timeout=request_timeout)[0]
+                consistency=consistency, refresh=True,
+                chunk_size=chunk_size, request_timeout=request_timeout)[0]
 
     def update(self, obj):
         """
@@ -316,11 +317,11 @@ class Index(object):
             x['_op_type'] = 'delete'
             return x
 
-        actions = itertools.imap(document_to_action, objs)
+        actions = imap(document_to_action, objs)
         consistency = consistency or self._meta.write_consistency
         bulk(
-                connection, actions, index=index_name, consistency=consistency,
-                refresh=True)
+            connection, actions, index=index_name, refresh=True,
+            consistency=consistency)
 
     def drop_index(self, using=None):
         from elasticsearch.client.indices import IndicesClient

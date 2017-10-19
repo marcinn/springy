@@ -51,9 +51,14 @@ class Document(DocType):
 
         keys = self._doc_type.mapping.properties.properties._d_.keys()
 
+        to_delete = []
+
         for key in self._d_.keys():
             if key not in keys:
-                del self._d_[key]
+                to_delete.append(key)
+
+        for key in to_delete:
+            del self._d_[key]
 
     def full_clean(self):
         try:
@@ -120,7 +125,16 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
             try:
                 field = get_model_field(model, field_name)
             except DjangoFieldDoesNotExist:
-                raise FieldDoesNotExist('Field %s is not defined' % field_name)
+                prepare_method = 'prepare_%s' % field_name
+                if hasattr(index, prepare_method):
+                    raise FieldDoesNotExist(
+                        'You have defined `%s()` method, '
+                        'but you have missed a field declaration.\n'
+                        'Add `%s` classfield to %s..' % (
+                            prepare_method, field_name, type(index)))
+                else:
+                    raise FieldDoesNotExist(
+                            'Field %s is not defined' % field_name)
             else:
                 attrs[field_name] = doctype_field_factory(field)
 

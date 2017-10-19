@@ -58,3 +58,18 @@ def generate_index_name(cls):
 
 def autodiscover(module_name='search'):
     module_loading.autodiscover_modules(module_name)
+
+
+def chunks(iterable, chunk_size):
+    for x in range(0, len(iterable), chunk_size):
+        yield iterable[x:x+chunk_size]
+
+
+def chunked(iterable, chunk_size):
+    x = 0
+    while True:
+        chunk = iterable[x:x+chunk_size]
+        if not chunk:
+            break
+        x += chunk_size
+        yield chunk
