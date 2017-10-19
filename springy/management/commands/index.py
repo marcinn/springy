@@ -1,9 +1,9 @@
+import six
 from django.core.management.base import BaseCommand, CommandError
-from builtins import input
 
 
 def confirm(question):
-    value = input(question+' [y/n]')  # NOQA
+    value = six.moves.input(question+' [y/n]')  # NOQA
     if value.strip().lower() == 'y':
         return True
 

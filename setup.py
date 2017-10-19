@@ -6,7 +6,6 @@ from setuptools import setup, find_packages
 
 install_requires = [
     'elasticsearch-dsl>=0.0.9',
-    'future',
     'six',
 ]
 

@@ -1,5 +1,4 @@
 from collections import defaultdict
-from builtins import map as imap
 import six
 
 from elasticsearch_dsl import Index as DSLIndex
@@ -270,7 +269,7 @@ class Index(object):
                 data['_%s' % key] = val
             return data
 
-        actions = imap(document_to_action, generate_qs())
+        actions = six.moves.imap(document_to_action, generate_qs())
         consistency = consistency or self._meta.write_consistency
 
         return bulk(
@@ -317,7 +316,7 @@ class Index(object):
             x['_op_type'] = 'delete'
             return x
 
-        actions = imap(document_to_action, objs)
+        actions = six.moves.imap(document_to_action, objs)
         consistency = consistency or self._meta.write_consistency
         bulk(
             connection, actions, index=index_name, refresh=True,
