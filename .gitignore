@@ -2,6 +2,7 @@
 /.env27
 /.env26
 /.env3
+/.eggs
 *.pyc
 
 /build/

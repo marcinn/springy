@@ -38,6 +38,27 @@ Springy goals:
 
 **Springy is under development. Use at own risk.**
 
+## Connections configuration
+
+Springy requires connections configuration to be set in your project'
+`settings` module as an `ELASTIC_DATABASES` dictionary. Configuration
+is similar to Django `DATABASES` dictionary. 
+
+The default connection name/alias is called `default`. 
+
+Databases configuration is passed through to ElasticSearch-DSL
+`conncetions.configure()`, so for the details please look at
+http://elasticsearch-dsl.readthedocs.io/en/latest/configuration.html
+
+Minimalistic configuration:
+
+```python
+ELASTIC_DATABASES = {
+    'default': {
+       'hosts': 'localhost',
+       }
+  }
+```
 ## High-Level API
 
 High-Level API is located in `springy` namespace. To work with these shortcut methods you should call `springy.autodisover()` on application startup.
@@ -47,6 +68,8 @@ Available methods:
 * `springy.autodiscover()` - find and register search indices in whole Django project
 * `springy.index(name)` - retrieve `Index` instance by its name
 * `springy.query(*indices)` - query specified indices by their names, returns `Search` lazy object
+* `springy.multisearch(index_name=None)` - construct MultiSearch object
+  with optional index to perform multisearch queries
 * `springy.parse(input_query_string)` - instantiate `Search` with DisMax query parser for specified input
 
 ## Autodiscover and index registration

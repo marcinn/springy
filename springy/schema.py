@@ -1,16 +1,23 @@
+from collections import OrderedDict
+
+from django.core.exceptions import ValidationError
 from elasticsearch_dsl import DocType
 from elasticsearch_dsl.exceptions import ValidationException
-from django.core.exceptions import ValidationError
+
 from .fields import doctype_field_factory
-from .exceptions import DocumentDoesNotExist
-from collections import OrderedDict
-import sys
+from .exceptions import DocumentDoesNotExist, FieldDoesNotExist  # NOQA
+from .utils import get_model_field
 
 
 try:
-    from django.db.models import FieldDoesNotExist
+    from django.db.models import (
+            FieldDoesNotExist as DjangoFieldDoesNotExist)
 except ImportError:
-    FieldDoesNotExist = TypeError
+    try:
+        from django.core.exceptions import (
+                FieldDoesNotExist as DjangoFieldDoesNotExist)
+    except ImportError:
+        DjangoFieldDoesNotExist = TypeError
 
 
 class Document(DocType):
@@ -45,14 +52,13 @@ class Document(DocType):
         keys = self._doc_type.mapping.properties.properties._d_.keys()
 
         for key in self._d_.keys():
-            if not key in keys:
+            if key not in keys:
                 del self._d_[key]
 
     def full_clean(self):
         try:
             super(Document, self).full_clean()
-        except (ValidationException):
-            ex = sys.exc_info()[1]
+        except ValidationException as ex:
             raise ValidationError(ex)
         else:
             self.clean_invalid_keys()
@@ -84,23 +90,39 @@ def model_doctype_factory(model, index, fields=None, exclude=None):
         fields = list(fields.difference(fields, set(exclude)))
 
     parent = (object,)
-    Meta = type(str('Meta'), parent, {
+    meta = {
         'index': index._meta.index,
-        })
+        }
+
+    if index._meta.doc_type:
+        # elasticsearch-dsl is written in a strange way.
+        # You can set empty/None as doc_type and it
+        # will get this value "as is".
+        #
+        # This is not "pythonic". Elasticsearch-dsl have
+        # more strange solutions implemented and it is
+        # not reliable. Avoid elasticsearch-dsl where possible.
+        #
+        # Springy will drop Elasticsearch-DSL dependency soon.
+
+        meta['doc_type'] = index._meta.doc_type
+
+    Meta = type(str('Meta'), parent, meta)
 
     attrs = {
             'Meta': Meta,
             }
+
     for field_name in fields:
         try:
-            attrs[field_name]=doctype_field_factory(
-                model._meta.get_field_by_name(field_name)[0])
-        except FieldDoesNotExist:
+            attrs[field_name] = index._meta._declared_fields[field_name]
+        except KeyError:
             try:
-                attrs[field_name] = index._meta._declared_fields[field_name]
-            except KeyError:
-                pass
-
+                field = get_model_field(model, field_name)
+            except DjangoFieldDoesNotExist:
+                raise FieldDoesNotExist('Field %s is not defined' % field_name)
+            else:
+                attrs[field_name] = doctype_field_factory(field)
 
     return type(Document)(class_name, (Document,), attrs)
 
@@ -139,10 +161,9 @@ class DocumentForm(object):
         for name, field in self.fields.items():
             try:
                 cleaned_data[name] = field.clean(cleaned_data.get(name))
-            except (ValidationError):
-                ex = sys.exc_info()[1]
+            except ValidationError as ex:
                 exceptions.append(ex)
-                errors[name]=unicode(ex)
+                errors[name] = unicode(ex)  # NOQA
 
         self.cleaned_data = cleaned_data
         self._errors = errors
@@ -166,5 +187,3 @@ class DocumentForm(object):
         except ValidationError:
             pass
         return self._is_valid
-
-

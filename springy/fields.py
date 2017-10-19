@@ -1,5 +1,5 @@
-from django.db import models
-from elasticsearch_dsl import (String, Date, Integer, Boolean, Float,
+from elasticsearch_dsl import (  # NOQA
+        String, Date, Integer, Boolean, Float,
         Short, Byte, Long, Double, Field, Object, Nested)
 
 
@@ -19,10 +19,12 @@ MODEL_FIELDS_MAP = {
     }
 
 
-def doctype_field_factory(field, **attr):
+def doctype_field_factory(field, **attrs):
     if getattr(field, 'is_relation', None) or getattr(field, 'related', None):
         if field.many_to_many:
-            raise TypeError('Field `%s` is m2m relation, which is not supported' % field.name)
+            raise TypeError(
+                    'Field `%s` is m2m relation, '
+                    'which is not supported' % field.name)
 
     key = field.get_internal_type()
 
@@ -31,8 +33,7 @@ def doctype_field_factory(field, **attr):
     except KeyError:
         fld = String
 
-    if isinstance(fld, String) and not 'analyzer' in attrs:
+    if isinstance(fld, String) and 'analyzer' not in attrs:
         attrs['analyzer'] = 'snowball'
 
-    return fld(**attr)
-
+    return fld(**attrs)

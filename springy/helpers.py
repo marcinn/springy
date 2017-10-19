@@ -1,4 +1,4 @@
-from .search import Search
+from .search import Search, MultiSearch
 from .utils import index_to_string
 from .indices import registry
 
@@ -19,6 +19,10 @@ def parse(query_string):
     return query().parse(query_string)
 
 
+def multisearch(index_name=None):
+    return MultiSearch(index=index(index_name) if index_name else None)
+
+
 def index(name):
     """
     Shortcut to getting and instantiate index class from registry
@@ -32,4 +36,3 @@ def model_indices(model_class):
     """
 
     return map(lambda x: x(), registry.get_for_model(model_class))
-

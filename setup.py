@@ -5,8 +5,8 @@ from setuptools import setup, find_packages
 
 
 install_requires = [
-    'django>=1.7,<1.10',
     'elasticsearch-dsl>=0.0.9',
+    'six',
 ]
 
 tests_require = []
@@ -21,7 +21,7 @@ setup(
     license="BSD",
     url="https://github.com/marcinn/springy",
     long_description='',
-    version='0.4-dev',
+    version='0.3.11',
     author="Marcin Nowak",
     author_email="marcin.j.nowak@gmail.com",
     packages=find_packages(
@@ -32,6 +32,7 @@ setup(
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
+        "Environment :: Web Environment",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7",
@@ -41,6 +42,9 @@ setup(
         "Framework :: Django :: 1.7",
         "Framework :: Django :: 1.8",
         "Framework :: Django :: 1.9",
+        "Framework :: Django :: 1.10",
+        "Framework :: Django :: 1.11",
+        "Topic :: Text Processing :: Indexing",
     ],
     keywords="elasticsearch django springy",
     install_requires=install_requires,
