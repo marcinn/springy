@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import sys
-from os.path import join, dirname
 from setuptools import setup, find_packages
 
 
 install_requires = [
-    'elasticsearch-dsl>=0.0.9',
+    'elasticsearch-dsl>=5.0.0',
     'six',
 ]
 
@@ -21,7 +20,7 @@ setup(
     license="BSD",
     url="https://github.com/marcinn/springy",
     long_description='',
-    version='0.3.12',
+    version='0.5.0-a1',
     author="Marcin Nowak",
     author_email="marcin.j.nowak@gmail.com",
     packages=find_packages(
@@ -49,5 +48,5 @@ setup(
     ],
     keywords="elasticsearch django springy",
     install_requires=install_requires,
-    dependency_links=['https://github.com/elasticsearch/elasticsearch-dsl-py#egg=elasticsearch-dsl-py'],
+    dependency_links=['https://github.com/elasticsearch/elasticsearch-dsl-py#egg=elasticsearch-dsl-py'],  # NOQA
 )
