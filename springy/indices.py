@@ -10,6 +10,11 @@ from .search import IterableSearch, MultiSearch
 from .schema import model_doctype_factory, Schema
 from .exceptions import DocumentDoesNotExist, FieldDoesNotExist
 
+try:
+    import itertools.imap as map
+except ImportError:
+    pass
+
 
 class AlreadyRegisteredError(Exception):
     pass
@@ -272,7 +277,7 @@ class Index(object):
                 data['_%s' % key] = val
             return data
 
-        actions = six.moves.imap(document_to_action, generate_qs())
+        actions = map(document_to_action, generate_qs())
 
         return bulk(
                 connection, actions, index=index_name, doc_type=doctype_name,
@@ -319,7 +324,7 @@ class Index(object):
             x['_op_type'] = 'delete'
             return x
 
-        actions = six.moves.imap(document_to_action, objs)
+        actions = map(document_to_action, objs)
         wait_for_active_shards = (
                 wait_for_active_shards or self._meta.wait_for_active_shards)
         bulk(
