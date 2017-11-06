@@ -10,6 +10,11 @@ from .search import IterableSearch, MultiSearch
 from .schema import model_doctype_factory, Schema
 from .exceptions import DocumentDoesNotExist, FieldDoesNotExist
 
+try:
+    import itertools.imap as map
+except ImportError:
+    pass
+
 
 class AlreadyRegisteredError(Exception):
     pass
@@ -36,7 +41,7 @@ class IndicesRegistry(object):
 
         try:
             self._model_indices[cls.model].append(cls)
-        except:
+        except Exception:
             del self._indices[name]
             raise
 
@@ -80,8 +85,8 @@ class IndexOptions(object):
         self.meta = getattr(meta, 'index_meta', None)
         self.optimize_query = getattr(meta, 'optimize_query', False)
         self.index = getattr(meta, 'index', None)
-        self.read_consistency = getattr(meta, 'read_consistency', 'quorum')
-        self.write_consistency = getattr(meta, 'write_consistency', 'quorum')
+        self.wait_for_active_shards = getattr(
+                meta, 'wait_for_active_shards', 1)
         self._field_names = getattr(meta, 'fields', None) or []
         self._declared_fields = declared_fields
 
@@ -245,8 +250,8 @@ class Index(object):
         doc.save()
 
     def save_many(
-            self, objects, using=None, consistency=None, chunk_size=100,
-            request_timeout=30):
+            self, objects, using=None, wait_for_active_shards=None,
+            chunk_size=100, request_timeout=30):
 
         from elasticsearch.helpers import bulk
 
@@ -262,6 +267,9 @@ class Index(object):
         connection = get_connection_for_doctype(
                 self._meta.document, using=using)
 
+        wait_for_active_shards = (
+                wait_for_active_shards or self._meta.wait_for_active_shards)
+
         def document_to_action(x):
             data = x.to_dict()
             data['_op_type'] = 'index'
@@ -269,15 +277,14 @@ class Index(object):
                 data['_%s' % key] = val
             return data
 
-        actions = six.moves.imap(document_to_action, generate_qs())
-        consistency = consistency or self._meta.write_consistency
+        actions = map(document_to_action, generate_qs())
 
         return bulk(
                 connection, actions, index=index_name, doc_type=doctype_name,
-                consistency=consistency, refresh=True,
+                wait_for_active_shards=wait_for_active_shards, refresh=True,
                 chunk_size=chunk_size, request_timeout=request_timeout)[0]
 
-    def update(self, obj):
+    def update(self, obj, **kwargs):
         """
         Perform create/update document only if matching indexing queryset
         """
@@ -287,25 +294,26 @@ class Index(object):
         except IndexError:
             pass
         else:
-            self.save(obj)
+            self.save(obj, **kwargs)
 
-    def update_queryset(self, queryset):
+    def update_queryset(self, queryset, **kwargs):
         """
         Perform create/update of queryset but narrowed with indexing queryset
         """
         qs = self.get_query_set()
         qs.query.combine(queryset.query, 'and')
-        return self.save_many(qs)
+        return self.save_many(qs, **kwargs)
 
     def update_index(
-            self, using=None, consistency=None, chunk_size=100,
+            self, using=None, wait_for_active_shards=None, chunk_size=100,
             request_timeout=30):
         self.save_many(
                 self.get_query_set(), using=using,
-                consistency=consistency, chunk_size=chunk_size,
+                wait_for_active_shards=wait_for_active_shards,
+                chunk_size=chunk_size,
                 request_timeout=request_timeout)
 
-    def clear_index(self, using=None, consistency=None):
+    def clear_index(self, using=None, wait_for_active_shards=None):
         from elasticsearch.helpers import scan, bulk
         connection = get_connection_for_doctype(
                 self._meta.document, using=using)
@@ -316,11 +324,12 @@ class Index(object):
             x['_op_type'] = 'delete'
             return x
 
-        actions = six.moves.imap(document_to_action, objs)
-        consistency = consistency or self._meta.write_consistency
+        actions = map(document_to_action, objs)
+        wait_for_active_shards = (
+                wait_for_active_shards or self._meta.wait_for_active_shards)
         bulk(
             connection, actions, index=index_name, refresh=True,
-            consistency=consistency)
+            wait_for_active_shards=wait_for_active_shards)
 
     def drop_index(self, using=None):
         from elasticsearch.client.indices import IndicesClient
