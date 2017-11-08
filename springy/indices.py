@@ -170,7 +170,40 @@ class Index(object):
         if not _idx.exists():
             _idx.create()
         else:
-            _idx.save()
+            static_settings = [
+                    'number_of_shards', 'codec', 'routing_partition_size']
+            not_updateable = [
+                    'number_of_shards',
+                    ]
+
+            def filter_out_not_updateable(settings):
+                return dict(filter(
+                    lambda x: x[0] not in not_updateable,
+                    settings.items()))
+
+            idx_dict = _idx.to_dict()
+            idx_settings = idx_dict.get('settings') or {}
+            idx_analysis = idx_settings.pop('analysis') or {}
+            idx_static = dict(map(
+                lambda x: (x, idx_settings.pop(x)),
+                list(filter(
+                    lambda x: x in static_settings, idx_settings))))
+
+            idx_settings = filter_out_not_updateable(idx_settings)
+            idx_static = filter_out_not_updateable(idx_static)
+
+            if idx_settings:
+                _idx.put_settings(body=idx_settings, preserve_existing=True)
+
+            try:
+                _idx.close()
+                _idx.put_settings(
+                        body={'analysis': idx_analysis},
+                        preserve_existing=True)
+                if idx_static:
+                    _idx.put_settings(body=idx_static, preserve_existing=True)
+            finally:
+                _idx.open()
 
         self._meta.document.init(using=using)
 

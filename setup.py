@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
+import os
 from setuptools import setup, find_packages
 
 
@@ -24,7 +25,6 @@ setup(
     author="Marcin Nowak",
     author_email="marcin.j.nowak@gmail.com",
     packages=find_packages(
-        where='.',
         exclude=('springy/tests',)
     ),
     classifiers=[
