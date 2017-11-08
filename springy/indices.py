@@ -163,9 +163,14 @@ class Index(object):
         from .settings import INDEX_DEFAULTS
         meta = dict(INDEX_DEFAULTS)
         meta.update(self._meta.meta or {})
+
         _idx = DSLIndex(self._meta.document._doc_type.index)
         _idx.settings(**meta)
-        _idx.create()
+
+        if not _idx.exists():
+            _idx.create()
+        else:
+            _idx.save()
 
         self._meta.document.init(using=using)
 
