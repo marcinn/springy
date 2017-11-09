@@ -175,6 +175,13 @@ BSD
 
 ## Changelog
 
+`5.0.1`
+- introduced `Index.prepare_object()` method for easy overriding
+- index updating via `initialize` management command
+
+`5.0.0`
+- Initial support for ElasticSearch 5.x
+
 `0.3.11`
 - Added support for Python 3 (Django 1.7.x only for Python 3.4)
 - Supported Django versions are 1.7, 1.8, 1.9, 1.10, 1.11
