@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
+import os
 from setuptools import setup, find_packages
 
 
@@ -20,11 +21,10 @@ setup(
     license="BSD",
     url="https://github.com/marcinn/springy",
     long_description='',
-    version='0.5.0',
+    version='5.0.1',
     author="Marcin Nowak",
     author_email="marcin.j.nowak@gmail.com",
     packages=find_packages(
-        where='.',
         exclude=('springy/tests',)
     ),
     classifiers=[

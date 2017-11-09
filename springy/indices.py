@@ -144,6 +144,9 @@ class Index(object):
     def name(self):
         return self._meta.index
 
+    def prepare_object(self, obj):
+        return model_to_dict(obj)
+
     def get_query_set(self):
         """
         Return queryset for indexing
@@ -163,9 +166,47 @@ class Index(object):
         from .settings import INDEX_DEFAULTS
         meta = dict(INDEX_DEFAULTS)
         meta.update(self._meta.meta or {})
+
         _idx = DSLIndex(self._meta.document._doc_type.index)
         _idx.settings(**meta)
-        _idx.create()
+
+        if not _idx.exists():
+            _idx.create()
+        else:
+            static_settings = [
+                    'number_of_shards', 'codec', 'routing_partition_size']
+            not_updateable = [
+                    'number_of_shards',
+                    ]
+
+            def filter_out_not_updateable(settings):
+                return dict(filter(
+                    lambda x: x[0] not in not_updateable,
+                    settings.items()))
+
+            idx_dict = _idx.to_dict()
+            idx_settings = idx_dict.get('settings') or {}
+            idx_analysis = idx_settings.pop('analysis') or {}
+            idx_static = dict(map(
+                lambda x: (x, idx_settings.pop(x)),
+                list(filter(
+                    lambda x: x in static_settings, idx_settings))))
+
+            idx_settings = filter_out_not_updateable(idx_settings)
+            idx_static = filter_out_not_updateable(idx_static)
+
+            if idx_settings:
+                _idx.put_settings(body=idx_settings, preserve_existing=True)
+
+            try:
+                _idx.close()
+                _idx.put_settings(
+                        body={'analysis': idx_analysis},
+                        preserve_existing=True)
+                if idx_static:
+                    _idx.put_settings(body=idx_static, preserve_existing=True)
+            finally:
+                _idx.open()
 
         self._meta.document.init(using=using)
 
@@ -217,7 +258,7 @@ class Index(object):
         """
         Convert model instance to ElasticSearch document
         """
-        data = model_to_dict(obj)
+        data = self.prepare_object(obj)
         for field_name in self._meta._field_names:
             prepared_field_name = 'prepare_%s' % field_name
             if hasattr(self, prepared_field_name):
