@@ -144,6 +144,9 @@ class Index(object):
     def name(self):
         return self._meta.index
 
+    def prepare_object(self, obj):
+        return model_to_dict(obj)
+
     def get_query_set(self):
         """
         Return queryset for indexing
@@ -255,7 +258,7 @@ class Index(object):
         """
         Convert model instance to ElasticSearch document
         """
-        data = model_to_dict(obj)
+        data = self.prepare_object(obj)
         for field_name in self._meta._field_names:
             prepared_field_name = 'prepare_%s' % field_name
             if hasattr(self, prepared_field_name):
