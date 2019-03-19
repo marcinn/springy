@@ -269,7 +269,7 @@ class Index(object):
                 data['_%s' % key] = val
             return data
 
-        actions = six.moves.imap(document_to_action, generate_qs())
+        actions = six.moves.map(document_to_action, generate_qs())
         consistency = consistency or self._meta.write_consistency
 
         return bulk(
@@ -316,7 +316,7 @@ class Index(object):
             x['_op_type'] = 'delete'
             return x
 
-        actions = six.moves.imap(document_to_action, objs)
+        actions = six.moves.map(document_to_action, objs)
         consistency = consistency or self._meta.write_consistency
         bulk(
             connection, actions, index=index_name, refresh=True,
