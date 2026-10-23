@@ -11,7 +11,7 @@ def query(*indices):
     This helper will instantiate `Search` object to perform further queries.
     """
 
-    indices = map(index_to_string, indices)
+    indices = list(map(index_to_string, indices))
     return Search(index=indices)
 
 
@@ -35,4 +35,4 @@ def model_indices(model_class):
     Shortcut to getting registered index instances for specified model
     """
 
-    return map(lambda x: x(), registry.get_for_model(model_class))
+    return [x() for x in registry.get_for_model(model_class)]

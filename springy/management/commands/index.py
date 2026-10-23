@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 
 def confirm(question):
-    value = raw_input(question+' [y/n]')  # NOQA
+    value = input(question+' [y/n]')  # NOQA
     if value.strip().lower() == 'y':
         return True
 
@@ -55,7 +55,7 @@ class Command(BaseCommand):
         from springy.indices import registry
 
         if indices:
-            index_classes = map(lambda x: registry.get(x), indices)
+            index_classes = [registry.get(x) for x in indices]
         else:
             index_classes = registry.get_all()
 
@@ -83,14 +83,14 @@ class Command(BaseCommand):
                 chunk_size=self.chunk_size)
 
     def do_clear(self, indices, no_confirm=False):
-        indices_list = u'\n'.join(map(lambda x: u'\t- %s' % x, indices))
+        indices_list = '\n'.join(['\t- %s' % x for x in indices])
         if no_confirm or confirm(
                 'This will erase all documents from indices:\n'
                 '%s\n\nContinue?' % indices_list):
             self._call_indices(indices, 'clear_index')
 
     def do_drop(self, indices, no_confirm=False):
-        indices_list = u'\n'.join(map(lambda x: u'\t- %s' % x, indices))
+        indices_list = '\n'.join(['\t- %s' % x for x in indices])
         if no_confirm or confirm(
                 'This command will drop indices:\n'
                 '%s\n\nContinue?' % indices_list):

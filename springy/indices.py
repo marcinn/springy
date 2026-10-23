@@ -60,14 +60,14 @@ class IndicesRegistry(object):
             raise NotRegisteredError('Index `%s` is not registered' % name)
 
     def get_all(self):
-        return self._indices.values()
+        return list(self._indices.values())
 
     def get_for_model(self, model):
-        return map(self.get, self._model_indices[model])
+        return list(map(self.get, self._model_indices[model]))
 
     def unregister(self, cls):
         to_unregister = []
-        for name, idx in self._indices.items():
+        for name, idx in list(self._indices.items()):
             if idx == cls:
                 to_unregister.append(name)
         if not to_unregister:
@@ -165,7 +165,7 @@ class IndexBase(type):
             meta = getattr(new_class, 'Meta', None)
 
         declared_fields = {}
-        for _attrname, _attr in new_class.__dict__.items():
+        for _attrname, _attr in list(new_class.__dict__.items()):
             if isinstance(_attr, Field):
                 declared_fields[_attrname] = _attr
                 delattr(new_class, _attrname)
@@ -256,9 +256,7 @@ class ModelIndexerBase(IndexerBase):
         return new_class
 
 
-class Index(object):
-    __metaclass__ = IndexBase
-
+class Index(object, metaclass=IndexBase):
     def __init__(self):
         self.indexers = []
 
@@ -327,7 +325,7 @@ class Index(object):
             x['_op_type'] = 'delete'
             return x
 
-        actions = itertools.imap(document_to_action, objs)
+        actions = map(document_to_action, objs)
         consistency = consistency or self._meta.write_consistency
         bulk(
             connection, actions, index=index_name, consistency=consistency,
@@ -357,9 +355,7 @@ class Index(object):
         self.indexers.append(indexer(self))
 
 
-class Indexer(object):
-    __metaclass__ = IndexerBase
-
+class Indexer(object, metaclass=IndexerBase):
     def __init__(self, index):
         self.index = index
 
@@ -392,9 +388,7 @@ class Indexer(object):
             self.save_document(doc, using=using)
 
 
-class ModelIndexer(Indexer):
-    __metaclass__ = ModelIndexerBase
-
+class ModelIndexer(Indexer, metaclass=ModelIndexerBase):
     def get_query_set(self):
         """
         Return queryset for indexing
@@ -445,11 +439,11 @@ class ModelIndexer(Indexer):
         def document_to_action(x):
             data = x.to_dict()
             data['_op_type'] = 'index'
-            for key, val in x.meta.to_dict().items():
+            for key, val in list(x.meta.to_dict().items()):
                 data['_%s' % key] = val
             return data
 
-        actions = itertools.imap(document_to_action, generate_qs())
+        actions = map(document_to_action, generate_qs())
         consistency = consistency or self.index._meta.write_consistency
 
         return bulk(

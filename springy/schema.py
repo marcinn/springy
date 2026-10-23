@@ -40,9 +40,9 @@ class Document(DocType):
         to prevent dynamic/magical/unwanted index schema mutation.
         """
 
-        keys = self._doc_type.mapping.properties.properties._d_.keys()
+        keys = list(self._doc_type.mapping.properties.properties._d_.keys())
 
-        for key in self._d_.keys():
+        for key in list(self._d_.keys()):
             if key not in keys:
                 del self._d_[key]
 
@@ -144,7 +144,7 @@ class Schema(object):
         self.fields = OrderedDict(fields)
 
     def get_field_names(self):
-        return self.fields.keys()
+        return list(self.fields.keys())
 
     def get_field_by_name(self, name):
         return self.fields[name]
@@ -164,18 +164,18 @@ class DocumentForm(object):
         errors = {}
         exceptions = []
 
-        keys = self.fields.keys()
-        cleaned_data = map(filter(lambda x: x[0] in keys, data))
+        keys = list(self.fields.keys())
+        cleaned_data = list(map([x for x in data if x[0] in keys]))
 
         if not cleaned_data and not self.allow_empty:
             raise ValidationError('Data is empty')
 
-        for name, field in self.fields.items():
+        for name, field in list(self.fields.items()):
             try:
                 cleaned_data[name] = field.clean(cleaned_data.get(name))
             except ValidationError as ex:
                 exceptions.append(ex)
-                errors[name] = unicode(ex)  # NOQA
+                errors[name] = str(ex)  # NOQA
 
         self.cleaned_data = cleaned_data
         self._errors = errors
